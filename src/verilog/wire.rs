@@ -6,7 +6,7 @@ use std::ops::{RangeInclusive};
 use std::sync::{Arc, LazyLock, Mutex};
 
 pub struct WireBuilder {
-    wires: HashMap<Arc<VerilogWire>, WirePayload>
+    wires: HashMap<String, (Arc<VerilogWire>, WirePayload)>
 }
 static WIRE_BUILDER_INSTANCE: LazyLock<Mutex<WireBuilder>> = LazyLock::new(|| {
     Mutex::new(WireBuilder {
@@ -14,40 +14,34 @@ static WIRE_BUILDER_INSTANCE: LazyLock<Mutex<WireBuilder>> = LazyLock::new(|| {
     })
 });
 impl WireBuilder {
-    fn get_or_create_wire(builder: &mut WireBuilder, name: &str) -> Arc<VerilogWire> {
-        if let Some(wire_arc) = builder.wires.get_key_value(name).map(|(k, _)| Arc::clone(k)) {
-            wire_arc
-        } else {
-            let new_wire = Arc::new(VerilogWire::new(name.into()));
-            builder.wires.entry(Arc::clone(&new_wire)).or_default();
-            new_wire
-        }
-    }
+
     pub fn add_driver_wire(name:&str, range: RangeInclusive<usize>) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
-        let arc_wire = Self::get_or_create_wire(&mut wire_builder, name);
-        let payload = wire_builder.wires.get_mut(&arc_wire).unwrap();
+        let (arc_wire, payload) = wire_builder.wires
+            .entry(name.into())
+            .or_insert_with(|| {(Arc::new(VerilogWire::new(name.into())), Default::default())});
         for i in range {
             if !payload.driver.insert(i) {
                 log::error!("wire {} has multi driver", name)
             }
         }
-        arc_wire
+        Arc::clone(arc_wire)
     }
 
     pub fn add_load_wire(name: &str, range: RangeInclusive<usize>) -> Arc<VerilogWire>{
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
-        let arc_wrie = Self::get_or_create_wire(&mut wire_builder, name);
-        let payload = wire_builder.wires.get_mut(&arc_wrie).unwrap();
+        let (arc_wire, payload) = wire_builder.wires
+            .entry(name.into())
+            .or_insert_with(|| {(Arc::new(VerilogWire::new(name.into())), Default::default())});
         for i in range {
             payload.load.insert(i);
         }
-        arc_wrie
+        Arc::clone(arc_wire)
     }
 
     fn get_width(name: &str) -> usize {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
-        let WirePayload { driver, load} = wire_builder.wires
+        let (_wire, WirePayload {driver, load}) = wire_builder.wires
             .get(name)
             .expect(&format!("Wire {} has not been defined", name));
         let res = max(
@@ -57,7 +51,7 @@ impl WireBuilder {
     }
 
     fn builder_show() {
-        let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let res = &wire_builder.wires;
         println!("{:#?}", res)
     }
@@ -105,7 +99,7 @@ mod test {
 
     #[test]
     fn test_builder() {
-        simple_logger::init_with_level(log::Level::Info);
+        simple_logger::init_with_level(log::Level::Info).unwrap();
         WireBuilder::add_load_wire("testwire1", 0..=0);
         WireBuilder::add_driver_wire("testwire1", 0..=0);
         WireBuilder::add_driver_wire("testwire2", 0..=6);
