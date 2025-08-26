@@ -15,12 +15,15 @@ static WIRE_BUILDER_INSTANCE: LazyLock<Mutex<WireBuilder>> = LazyLock::new(|| {
 });
 impl WireBuilder {
 
-    pub fn add_driver_wire(name:&str, range: RangeInclusive<usize>) -> Arc<VerilogWire> {
+    pub fn add_driver_wire<T>(name:&str, range: &T) -> Arc<VerilogWire> 
+    where 
+        T: IntoIterator<Item = usize> + Clone,
+    {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload) = wire_builder.wires
             .entry(name.into())
             .or_insert_with(|| {(Arc::new(VerilogWire::new(name.into())), Default::default())});
-        for i in range {
+        for i in range.clone().into_iter() {
             if !payload.driver.insert(i) {
                 log::error!("wire {} has multi driver", name)
             }
@@ -28,12 +31,15 @@ impl WireBuilder {
         Arc::clone(arc_wire)
     }
 
-    pub fn add_load_wire(name: &str, range: RangeInclusive<usize>) -> Arc<VerilogWire>{
+    pub fn add_load_wire<T>(name: &str, range: &T) -> Arc<VerilogWire>
+    where 
+        T: IntoIterator<Item = usize> + Clone,
+    {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload) = wire_builder.wires
             .entry(name.into())
             .or_insert_with(|| {(Arc::new(VerilogWire::new(name.into())), Default::default())});
-        for i in range {
+        for i in range.clone().into_iter() {
             payload.load.insert(i);
         }
         Arc::clone(arc_wire)
@@ -68,14 +74,16 @@ impl WireBuilder {
         }
     }
 
-    fn check_health() {
+    pub fn check_health() {
+        log::info!("WireBuilder health check start >>>>");
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         for (wire, payload) in wire_builder.wires.values() {
             Self::check_driver_load(&payload.driver, &payload.load, &wire.name);
         }
+        log::info!("WireBuilder health check end  <<<<");
     }
 
-    fn builder_show() {
+    pub fn builder_show() {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let res = &wire_builder.wires;
         println!("{:#?}", res)
@@ -125,17 +133,17 @@ mod test {
     #[test]
     fn test_builder() {
         simple_logger::init_with_level(log::Level::Info).unwrap();
-        WireBuilder::add_load_wire("testwire1", 0..=0);
-        WireBuilder::add_driver_wire("testwire1", 0..=0);
-        WireBuilder::add_driver_wire("testwire2", 0..=6);
-        WireBuilder::add_load_wire("testwire3", 0..=2);
+        WireBuilder::add_load_wire("testwire1", &(0..=0));
+        WireBuilder::add_driver_wire("testwire1", &(0..=0));
+        WireBuilder::add_driver_wire("testwire2", &(0..=6));
+        WireBuilder::add_load_wire("testwire3", &(0..=2));
         WireBuilder::builder_show();
         println!("wire1 width is {}", WireBuilder::get_width("testwire1"));
         println!("wire2 width is {}", WireBuilder::get_width("testwire2"));
         println!("wire3 width is {}", WireBuilder::get_width("testwire3"));
         // println!("wire3 width is {}", WireBuilder::get_width("testwire333"));
 
-        WireBuilder::add_driver_wire("testwire2", 0..=0);
+        WireBuilder::add_driver_wire("testwire2", &(0..=0));
         WireBuilder::check_health();
     }
 }
