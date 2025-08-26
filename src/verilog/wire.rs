@@ -50,6 +50,31 @@ impl WireBuilder {
         res + 1
     }
 
+    fn check_driver_load(driver: &HashSet<usize>, load: &HashSet<usize>, name: &str) {
+        let mut no_driver = load.difference(driver).collect::<Vec<_>>();
+        if !no_driver.is_empty() {
+            no_driver.sort();
+            for bit in no_driver{
+                log::error!("wire {}[{}] has load but no driver", name, bit);
+            }
+        }
+
+        let mut no_load = driver.difference(load).collect::<Vec<_>>();
+        if !no_load.is_empty() {
+            no_load.sort();
+            for bit in no_load{
+                log::warn!("wire {}[{}] has driver but no load", name, bit);
+            }
+        }
+    }
+
+    fn check_health() {
+        let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        for (wire, payload) in wire_builder.wires.values() {
+            Self::check_driver_load(&payload.driver, &payload.load, &wire.name);
+        }
+    }
+
     fn builder_show() {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let res = &wire_builder.wires;
@@ -108,7 +133,9 @@ mod test {
         println!("wire1 width is {}", WireBuilder::get_width("testwire1"));
         println!("wire2 width is {}", WireBuilder::get_width("testwire2"));
         println!("wire3 width is {}", WireBuilder::get_width("testwire3"));
+        // println!("wire3 width is {}", WireBuilder::get_width("testwire333"));
 
         WireBuilder::add_driver_wire("testwire2", 0..=0);
+        WireBuilder::check_health();
     }
 }
