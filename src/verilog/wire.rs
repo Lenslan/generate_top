@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::ops::{RangeInclusive};
+use std::ops::{Range, RangeInclusive};
 use std::sync::{Arc, LazyLock, Mutex};
 
 pub struct WireBuilder {
@@ -15,10 +15,7 @@ static WIRE_BUILDER_INSTANCE: LazyLock<Mutex<WireBuilder>> = LazyLock::new(|| {
 });
 impl WireBuilder {
 
-    pub fn add_driver_wire<T>(name:&str, range: &T) -> Arc<VerilogWire> 
-    where 
-        T: IntoIterator<Item = usize> + Clone,
-    {
+    pub fn add_driver_wire(name:&str, range: &Range<usize>) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload) = wire_builder.wires
             .entry(name.into())
@@ -31,10 +28,7 @@ impl WireBuilder {
         Arc::clone(arc_wire)
     }
 
-    pub fn add_load_wire<T>(name: &str, range: &T) -> Arc<VerilogWire>
-    where 
-        T: IntoIterator<Item = usize> + Clone,
-    {
+    pub fn add_load_wire(name: &str, range: &Range<usize>) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload) = wire_builder.wires
             .entry(name.into())
@@ -133,17 +127,17 @@ mod test {
     #[test]
     fn test_builder() {
         simple_logger::init_with_level(log::Level::Info).unwrap();
-        WireBuilder::add_load_wire("testwire1", &(0..=0));
-        WireBuilder::add_driver_wire("testwire1", &(0..=0));
-        WireBuilder::add_driver_wire("testwire2", &(0..=6));
-        WireBuilder::add_load_wire("testwire3", &(0..=2));
+        WireBuilder::add_load_wire("testwire1", &(0..1));
+        WireBuilder::add_driver_wire("testwire1", &(0..1));
+        WireBuilder::add_driver_wire("testwire2", &(0..6));
+        WireBuilder::add_load_wire("testwire3", &(0..2));
         WireBuilder::builder_show();
         println!("wire1 width is {}", WireBuilder::get_width("testwire1"));
         println!("wire2 width is {}", WireBuilder::get_width("testwire2"));
         println!("wire3 width is {}", WireBuilder::get_width("testwire3"));
         // println!("wire3 width is {}", WireBuilder::get_width("testwire333"));
 
-        WireBuilder::add_driver_wire("testwire2", &(0..=0));
+        WireBuilder::add_driver_wire("testwire2", &(0..1));
         WireBuilder::check_health();
     }
 }

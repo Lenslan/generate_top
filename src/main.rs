@@ -18,4 +18,5 @@ fn main() {
 
     let res = set2.difference(&set1).collect::<Vec<_>>();
     println!("{:?}", res);
+    
 }
