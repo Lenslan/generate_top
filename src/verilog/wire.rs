@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::ops::{Range, RangeInclusive};
+use std::ops::{Range};
 use std::sync::{Arc, LazyLock, Mutex};
 
 pub struct WireBuilder {

@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 log = "0.4.27"
 simple_logger = "5.0.0"
+anyhow = "1.0.99"

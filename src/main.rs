@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 mod verilog;
+mod utils;
 
 use verilog::wire::VerilogWire;
 

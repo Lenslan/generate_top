@@ -13,8 +13,8 @@ pub struct VerilogPort {
     info: String,
 
     signals: Vec<VerilogValue>,
-    connected: Vec<usize>,
-    idx: usize,
+    has_undefine: bool,
+
 }
 impl VerilogPort {
     pub fn new(inout: PortDir, name: &str, width: usize) -> Self {
@@ -24,14 +24,14 @@ impl VerilogPort {
             width,
             info: String::new(),
             signals: vec![VerilogValue::NONE],
-            connected: vec![0;width],
-            idx: 0,
+            has_undefine: false,
+
         }
     }
 
     fn connect_full_signal(&mut self, sig: &str) {
-        todo!()
-        // self.connect_partial_signal(sig, &(0..self.width));
+        self.signals.push(VerilogValue::UndefinedWire(sig.into()));
+        self.has_undefine = true;
     }
 
     fn connect_partial_signal(&mut self, sig: &str, range: &Range<usize>){
@@ -40,32 +40,18 @@ impl VerilogPort {
             PortDir::OutPort => WireBuilder::add_driver_wire(sig, range),
             _ => WireBuilder::add_load_wire(sig, range)             //TODO how to process inout port
         };
-        let signal_position = self.signals.len();
         self.signals.push(Wire(Arc::clone(&wire), range.clone()));
-
-        let temp = self.idx + range.len();
-        for i in self.idx..temp {
-            self.connected[i] = signal_position;
-        }
-        self.idx = temp;
     }
 
     fn connect_number_signal(&mut self, num_val: u128, num_bits: u8) {
-        let signal_position = self.signals.len();
         self.signals.push(Number {
             width: num_bits,
             value: num_val
         });
-        let temp = self.idx + num_bits as usize;
-        for i in self.idx..temp {
-            self.connected[i] = signal_position;
-        }
-        self.idx = temp;
-
     }
 
 
-    fn check_health(&self) {
+    fn check_health(&self) -> anyhow::Result<()> {
         todo!()
         // for (bit, flag) in self.connected.iter().enumerate() {
         //     if flag.is_none() {
@@ -113,6 +99,7 @@ impl PortDir {
 #[derive(Debug, Clone)]
 enum VerilogValue {
     Wire(Arc<VerilogWire>, Range<usize>),
+    UndefinedWire(String),
     Number{
         width: u8,
         value: u128
