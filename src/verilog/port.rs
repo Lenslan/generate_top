@@ -13,7 +13,7 @@ pub struct VerilogPort {
     info: String,
 
     signals: Vec<VerilogValue>,
-    has_undefine: bool,
+    has_undefine: u8,
 
 }
 impl VerilogPort {
@@ -24,14 +24,14 @@ impl VerilogPort {
             width,
             info: String::new(),
             signals: vec![VerilogValue::NONE],
-            has_undefine: false,
+            has_undefine: 0,
 
         }
     }
 
     fn connect_full_signal(&mut self, sig: &str) {
         self.signals.push(VerilogValue::UndefinedWire(sig.into()));
-        self.has_undefine = true;
+        self.has_undefine += 1;
     }
 
     fn connect_partial_signal(&mut self, sig: &str, range: &Range<usize>){
