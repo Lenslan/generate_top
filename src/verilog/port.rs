@@ -1,6 +1,5 @@
-use std::{ops::RangeInclusive, sync::Arc, vec};
+use std::{sync::Arc, vec};
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::ops::Range;
 use crate::verilog::port::VerilogValue::{Number, Wire};
 use crate::verilog::wire::{VerilogWire, WireBuilder};
@@ -30,6 +29,10 @@ impl VerilogPort {
         }
     }
 
+    ///
+    /// connect wire to this port
+    /// register wires by WireBuilder
+    ///
     fn connect_wire(&self, sig: &str, range: &Range<usize>) -> Arc<VerilogWire> {
         match self.inout {
             PortDir::InPort => WireBuilder::add_load_wire(sig, range),
@@ -38,16 +41,27 @@ impl VerilogPort {
         }
     }
 
+    ///
+    /// register undefined wire whose width is not declared
+    /// those width will be inferred by `set_undefine_wire`
+    /// or `solve_func`
+    ///
     fn connect_undefined_signal(&mut self, sig: &str) {
         self.signals.push(VerilogValue::UndefinedWire(sig.into()));
         self.has_undefine += 1;
     }
 
+    ///
+    /// register wires whose width is declared
+    ///
     fn connect_partial_signal(&mut self, sig: &str, range: &Range<usize>){
         let wire = self.connect_wire(sig, range);
         self.signals.push(Wire(Arc::clone(&wire), range.clone()));
     }
 
+    ///
+    /// register const number which connected to this port
+    ///
     fn connect_number_signal(&mut self, num_val: u128, num_bits: u8) {
         self.signals.push(Number {
             width: num_bits,
@@ -55,6 +69,9 @@ impl VerilogPort {
         });
     }
 
+    ///
+    /// get bit-width of the existing signal which connected to this port
+    ///
     fn get_connected_width(&self) -> usize {
         let mut width_sum = 0;
         for sig in self.signals.iter() {
@@ -67,6 +84,9 @@ impl VerilogPort {
         width_sum
     }
 
+    ///
+    /// infer undefined wire's width
+    ///
     fn set_undefine_wire(&mut self) {
         let width_sum = self.get_connected_width();
         let wire_infer_width = self.width - width_sum;
@@ -86,6 +106,9 @@ impl VerilogPort {
         self.has_undefine -= 1;
     }
 
+    ///
+    /// check the signals are full connected
+    ///
     fn check_connected(&self) {
         let width_sum = self.get_connected_width();
         match self.width.cmp(&width_sum) {
@@ -95,11 +118,20 @@ impl VerilogPort {
         }
     }
 
+    ///
+    /// process the undefine wires which connected to this port more than 1
+    /// 通过 `HashMap<String, usize>`来注册，通过wire 名字得到她的索引
+    /// 矩阵计算完成之后，通过usize 来查看Vec<u8> 来获取位宽
+    ///
     fn register_undefine_wire(&self) {
         todo!()
     }
 
 
+    ///
+    /// check connect
+    /// much call this function after this port has benn all connected
+    ///
     fn check_health(&mut self) {
         match self.has_undefine {
             0 => self.check_connected(),

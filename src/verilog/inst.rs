@@ -20,6 +20,9 @@ impl VerilogInst {
         }
     }
 
+    ///
+    /// Adds a new port to the module's port list.
+    ///
     fn add_port(&mut self, inout: PortDir, name: &str, width: u32) {
         self.port_list.push(VerilogPort::new(
             inout,
@@ -28,10 +31,16 @@ impl VerilogInst {
         ))
     }
 
+    ///
+    /// Fix instance name
+    ///
     pub fn fix_inst_name(&mut self, inst_name: &str) {
         self.inst_name = inst_name.into();
     }
 
+    ///
+    /// output instance String
+    ///
     fn to_string(&self) -> Vec<String> {
         let mut res = Vec::new();
         res.push(format!("{} {} (", self.module_name, self.inst_name));

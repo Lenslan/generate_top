@@ -15,6 +15,9 @@ static WIRE_BUILDER_INSTANCE: LazyLock<Mutex<WireBuilder>> = LazyLock::new(|| {
 });
 impl WireBuilder {
 
+    ///
+    /// register wire which connected to output port
+    ///
     pub fn add_driver_wire(name:&str, range: &Range<usize>) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload) = wire_builder.wires
@@ -28,6 +31,9 @@ impl WireBuilder {
         Arc::clone(arc_wire)
     }
 
+    ///
+    /// register wire which connected to input port
+    ///
     pub fn add_load_wire(name: &str, range: &Range<usize>) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload) = wire_builder.wires
@@ -39,6 +45,9 @@ impl WireBuilder {
         Arc::clone(arc_wire)
     }
 
+    ///
+    /// get wire width
+    ///
     fn get_width(name: &str) -> usize {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (_wire, WirePayload {driver, load}) = wire_builder.wires
@@ -50,6 +59,9 @@ impl WireBuilder {
         res + 1
     }
 
+    ///
+    /// check wire has driver & load
+    ///
     fn check_driver_load(driver: &HashSet<usize>, load: &HashSet<usize>, name: &str) {
         let mut no_driver = load.difference(driver).collect::<Vec<_>>();
         if !no_driver.is_empty() {
@@ -68,6 +80,10 @@ impl WireBuilder {
         }
     }
 
+    ///
+    /// check all the wires has driver & load
+    /// must call this function after connected all the port
+    ///
     pub fn check_health() {
         log::info!("WireBuilder health check start >>>>");
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
@@ -77,6 +93,9 @@ impl WireBuilder {
         log::info!("WireBuilder health check end  <<<<");
     }
 
+    ///
+    /// debug: show the builder
+    ///
     pub fn builder_show() {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let res = &wire_builder.wires;
