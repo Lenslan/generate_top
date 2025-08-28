@@ -1,11 +1,11 @@
 
-trait SolveFunc {
+pub trait SolveFunc {
     // 直接输入增广矩阵
-    fn solve(&mut self) -> Option<Vec<i64>>;
+    fn solve(&mut self) -> Option<Vec<usize>>;
 }
 
 impl SolveFunc for Vec<Vec<i64>> {
-    fn solve(&mut self,) -> Option<Vec<i64>> {
+    fn solve(&mut self,) -> Option<Vec<usize>> {
         let num_eqs = self.len();
         let num_vars = self.get(0).map_or(0, |v| v.len() - 1);
 
@@ -55,7 +55,7 @@ impl SolveFunc for Vec<Vec<i64>> {
             }
             x[i] = rhs / divisor;
         }
-        Some(x)
+        Some(x.iter().map(|&v| v as usize).collect::<Vec<_>>())
     }
 }
 

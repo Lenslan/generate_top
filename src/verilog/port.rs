@@ -1,10 +1,13 @@
 use std::{sync::Arc, vec};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::ops::Range;
+use std::sync::{LazyLock, Mutex};
 use crate::verilog::port::VerilogValue::{Number, Wire};
 use crate::verilog::wire::{VerilogWire, WireBuilder};
+use crate::utils::solve_func::SolveFunc;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VerilogPort {
     inout: PortDir,
     name: String,
@@ -14,6 +17,10 @@ pub struct VerilogPort {
 
     signals: Vec<VerilogValue>,
     has_undefine: u8,
+    undefine_wires_idx: Vec<(usize,usize)>,
+
+    health_checked: bool,
+    undefine_registered: bool,
 
 }
 impl VerilogPort {
@@ -22,10 +29,8 @@ impl VerilogPort {
             inout,
             name: String::from(name),
             width,
-            info: String::new(),
             signals: vec![VerilogValue::NONE],
-            has_undefine: 0,
-
+            ..Default::default()
         }
     }
 
@@ -87,7 +92,15 @@ impl VerilogPort {
     ///
     /// infer undefined wire's width
     ///
-    fn set_undefine_wire(&mut self) {
+    fn set_undefine_wire(&mut self, name: &str, width: usize, position: usize) {
+        let arc_wire = self.connect_wire(
+            name,
+            &(0..width)
+        );
+        self.signals[position] = Wire(Arc::clone(&arc_wire), 0..width);
+        self.has_undefine -= 1;
+    }
+    fn set_undefine_wire_1(&mut self) {
         let width_sum = self.get_connected_width();
         let wire_infer_width = self.width - width_sum;
         if wire_infer_width <= 0 {
@@ -98,24 +111,25 @@ impl VerilogPort {
             .iter()
             .enumerate()
             .find(|&sig| sig.1.is_undefine()).unwrap();
-        let arc_wire = self.connect_wire(
-            signal.get_name(),
-            &(0..wire_infer_width)
-        );
-        self.signals[idx] = Wire(Arc::clone(&arc_wire), 0..wire_infer_width);
-        self.has_undefine -= 1;
+        self.set_undefine_wire(
+            signal.clone().get_name(),
+            wire_infer_width,
+            idx);
+        self.health_checked = true;
     }
+
 
     ///
     /// check the signals are full connected
     ///
-    fn check_connected(&self) {
+    fn check_connected(&mut self) {
         let width_sum = self.get_connected_width();
         match self.width.cmp(&width_sum) {
             Ordering::Greater => log::warn!("Port {} has not been full connected", self.name),
             Ordering::Less => log::warn!("Port {} has been over connected", self.name),
             _ => {}
         }
+        self.health_checked = true;
     }
 
     ///
@@ -123,8 +137,39 @@ impl VerilogPort {
     /// 通过 `HashMap<String, usize>`来注册，通过wire 名字得到她的索引
     /// 矩阵计算完成之后，通过usize 来查看Vec<u8> 来获取位宽
     ///
-    fn register_undefine_wire(&self) {
-        todo!()
+    fn register_undefine_wire(&mut self) {
+        let mut func_group = Vec::new();
+        for (undefine_idx, sig) in self.signals.iter().enumerate() {
+            if sig.is_undefine() {
+                let res_idx = UndefineWireCollector::add_wires(sig.get_name());
+                self.undefine_wires_idx.push((undefine_idx,res_idx));
+                func_group.push(res_idx);
+            }
+        }
+        let width = self.get_connected_width();
+        let infer_width = self.width - width;
+        if infer_width <= 0 {
+            log::warn!("Port {} has not been full connected", self.name);
+        }
+        UndefineWireCollector::add_func(
+            func_group,
+            infer_width as i64,
+        );
+        self.undefine_registered = true;
+    }
+
+    fn update_undefine_wire(&mut self) {
+        let collector = WIRECOLLECTOR.lock().unwrap();
+        let mut temp = Vec::new();
+        for (undefine_idx, res_idx) in self.undefine_wires_idx.iter() {
+            let refer_width = collector.res[*res_idx];
+            let name = self.signals[*undefine_idx].get_name();
+            temp.push((name.to_string(), refer_width, *undefine_idx));
+        }
+        for (name, refer_width, undefine_idx) in temp {
+            self.set_undefine_wire(&name, refer_width, undefine_idx);
+        }
+        self.health_checked = true;
     }
 
 
@@ -133,10 +178,14 @@ impl VerilogPort {
     /// much call this function after this port has benn all connected
     ///
     fn check_health(&mut self) {
+        if self.health_checked {
+            return ;
+        }
         match self.has_undefine {
             0 => self.check_connected(),
-            1 => self.set_undefine_wire(),
-            _ => self.register_undefine_wire()
+            1 => self.set_undefine_wire_1(),
+            _ => if self.undefine_registered {self.update_undefine_wire()}
+                else { self.register_undefine_wire() }
         };
     }
 
@@ -149,9 +198,82 @@ impl VerilogPort {
         todo!()
     }
 }
-#[derive(Debug)]
+#[derive(Default)]
+struct UndefineWireCollector {
+    wires: HashMap<String, usize>,
+    func_groups: Vec<Vec<usize>>,
+    value: Vec<i64>,
+    res: Vec<usize>,
+}
+
+static WIRECOLLECTOR: LazyLock<Mutex<UndefineWireCollector>> = LazyLock::new(|| {
+    Mutex::new(UndefineWireCollector {
+        ..Default::default()
+    })
+});
+
+impl UndefineWireCollector {
+
+    ///
+    /// call this function by VerilogPort
+    ///
+    fn add_wires(wire: &str) -> usize {
+        let mut collector = WIRECOLLECTOR.lock().unwrap();
+        let len = collector.wires.len();
+        let res = collector.wires
+            .entry(wire.to_string())
+            .or_insert(len);
+        *res
+    }
+
+    ///
+    /// call this function by VerilogPort
+    ///
+    fn add_func(func: Vec<usize>, value: i64) {
+        let mut collector = WIRECOLLECTOR.lock().unwrap();
+        collector.func_groups.push(func);
+        collector.value.push(value);
+    }
+
+    ///
+    /// call this function after all the port are connected
+    ///
+    fn solve_func() {
+        let mut collector = WIRECOLLECTOR.lock().unwrap();
+        let num_vars = collector.wires.len();
+        let new_func = collector.func_groups
+            .iter()
+            .enumerate()
+            .map(|(idx, f)| {
+                let mut temp = vec![0; num_vars];
+                for c in f { temp[*c] = 1};
+                temp.push(collector.value[idx]);
+                temp
+            })
+            .collect::<Vec<Vec<_>>>()
+            .solve();
+
+        if let Some(res) = new_func {
+            collector.res = res;
+        } else {
+            log::error!("Can not infer wire-width from wires: \n{:#?}", collector.wires);
+        }
+    }
+
+    fn has_wires() -> bool {
+        let collector = WIRECOLLECTOR.lock().unwrap();
+        collector.wires.len() > 0
+    }
+}
+
+
+
+
+
+#[derive(Debug, Default)]
 pub enum PortDir {
     InPort,
+    #[default]
     OutPort,
     InOutPort,
 }
