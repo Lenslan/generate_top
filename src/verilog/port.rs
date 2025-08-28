@@ -3,17 +3,18 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::{LazyLock, Mutex};
+use strum::Display;
 use crate::verilog::port::VerilogValue::{Number, Wire};
 use crate::verilog::wire::{VerilogWire, WireBuilder};
 use crate::utils::solve_func::SolveFunc;
 
 #[derive(Debug, Default)]
 pub struct VerilogPort {
-    inout: PortDir,
-    name: String,
-    width: usize,
+    pub inout: PortDir,
+    pub name: String,
+    pub width: usize,
 
-    info: String,
+    pub info: String,
 
     signals: Vec<VerilogValue>,
     has_undefine: u8,
@@ -32,6 +33,10 @@ impl VerilogPort {
             signals: vec![VerilogValue::NONE],
             ..Default::default()
         }
+    }
+
+    pub fn set_info_msg(&mut self, msg: &str) {
+        self.info = String::from(msg);
     }
 
     ///
@@ -190,7 +195,7 @@ impl VerilogPort {
     }
 
 
-    pub fn to_inst_string(&self) -> String {
+    pub fn to_inst_string(&self, name_len: u8, signal_len: u8) -> String {
         todo!()
     }
 
@@ -270,11 +275,15 @@ impl UndefineWireCollector {
 
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Display)]
 pub enum PortDir {
+    #[strum(to_string = "input")]
     InPort,
     #[default]
+    #[strum(to_string = "output")]
     OutPort,
+
+    #[strum(to_string = "inout")]
     InOutPort,
 }
 
