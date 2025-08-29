@@ -7,13 +7,9 @@ mod utils;
 use verilog::wire::VerilogWire;
 
 fn main() {
-    let mut table1 = vec![
-        vec![1,2,3],
-        vec![4,6],
-        vec![8],
-    ];
-
-
-    println!("{:?}", table1);
+    let mut a = vec![1,2,3];
+    let b = vec![2,3,4];
+    a.extend(b);
+    println!("{:?}", a);
     
 }

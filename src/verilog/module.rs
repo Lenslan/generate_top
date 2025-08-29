@@ -65,15 +65,31 @@ impl VerilogModule {
 
     fn to_module_string(&self) -> Vec<String> {
         let mut res = Vec::new();
-        let mut indent = 0u8;
+        let mut indent = 0;
         res.push(format!("{} (", self.module_name));
 
         indent += 4;
-        for port in self.port_list.iter() {
-            res.push(format!("{inout} wire [0:{width}] {name}", inout=port.in))
+        if let Some((last_port, ports)) = self.port_list.split_last() {
+            for port in self.port_list.iter() {
+                res.push(format!("{indent_space}{inout} wire [0:{width}] {name},",
+                                 indent_space=" ".repeat(indent),
+                                 inout=port.inout,
+                                 width=port.width,
+                                 name=port.name))
+            }
+            res.push(format!("{indent_space}{inout} wire [0:{width}] {name});",
+                             indent_space=" ".repeat(indent),
+                             inout=last_port.inout,
+                             width=last_port.width,
+                             name=last_port.name))
         }
+        // 线网的定义  TODO
 
-
+        for inst in self.inst_list.iter() {
+            res.extend(inst.to_inst_string());
+            res.push("\n\n".into());
+        }
+        res.push("endmodule".into());
 
         todo!()
     }
