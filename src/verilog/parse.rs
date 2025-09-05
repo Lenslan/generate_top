@@ -86,7 +86,7 @@ impl VerilogParser {
 
                 },
                 RefNode::ModuleDeclarationAnsi(module) => {
-
+                    todo!()
                 },
                 _ => {}
             }
@@ -95,9 +95,15 @@ impl VerilogParser {
     }
 
     fn extract_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
+        log::info!("start extract ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter().flatten() {
-            if let Some(RefNode::PortDeclaration(port_dir)) = unwrap_node!(item, PortDeclaration) {
+            // println!("Node is {}", item);
+            if let RefNode::Locate(t) = item {
+                // println!("locate is {:?}", t);
+            }
+            if let RefNode::PortDeclaration(port_dir) = item {
+                println!("        ++++++++");
                 //port direction
                 let inout = Self::get_direction(port_dir);
 
@@ -148,10 +154,12 @@ impl VerilogParser {
             }
             _ => None,
         }?;
-        self.parse_res
+        let t= self.parse_res
             .as_ref()
             .unwrap()
-            .get_str(&locate)
+            .get_str(&locate);
+        println!("        ****{}", t.unwrap());
+        t
             .map(|s| s.to_string())
     }
 
@@ -170,7 +178,8 @@ mod test {
             .get_module_info();
         for m in module_info {
             println!("Module ---------------------");
-            // println!("{:#?}", m);
+            println!("{:#?}", m);
+            println!("module port number is {}", m.port_list.len())
         }
     }
 }

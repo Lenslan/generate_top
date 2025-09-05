@@ -8,7 +8,7 @@ const INST_SIGNAL_LEN:u8 = 20;
 pub struct VerilogModule {
     module_name: String,
     inst_name: Option<String>,
-    port_list: Vec<VerilogPort>,
+    pub port_list: Vec<VerilogPort>,
     inst_list: Vec<Arc<VerilogModule>>
 
 }
