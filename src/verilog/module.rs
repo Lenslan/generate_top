@@ -4,19 +4,18 @@ use crate::verilog::port::{PortDir, VerilogPort};
 
 const INST_NAME_LEN:u8 = 20;
 const INST_SIGNAL_LEN:u8 = 20;
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct VerilogModule {
-    inst_name: String,
     module_name: String,
+    inst_name: Option<String>,
     port_list: Vec<VerilogPort>,
     inst_list: Vec<Arc<VerilogModule>>
 
 }
 impl VerilogModule {
-    pub fn new(module_name: &str) -> Self {
+    pub fn new(module_name: String) -> Self {
         Self {
-            inst_name: format!("u_{}", module_name),
-            module_name: module_name.into(),
+            module_name,
             ..Default::default()
 
         }
@@ -25,15 +24,19 @@ impl VerilogModule {
     ///
     /// Adds a new port to the module's port list.
     ///
-    fn add_port(&mut self, inout: PortDir, name: &str, width: u32) {
+    pub fn add_port(&mut self, inout: PortDir, name: &str, width: u32) {
         self.port_list.push(VerilogPort::new(
             inout,
             name,
             width as usize
         ))
     }
+    
+    pub fn add_ports(&mut self, ports: Vec<VerilogPort>) {
+        self.port_list.extend(ports);
+    }
 
-    fn add_inst_module(&mut self, module: Arc<VerilogModule>) {
+    pub fn add_inst_module(&mut self, module: Arc<VerilogModule>) {
         self.inst_list.push(module);
     }
 
@@ -41,7 +44,7 @@ impl VerilogModule {
     /// Fix instance name
     ///
     pub fn fix_inst_name(&mut self, inst_name: &str) {
-        self.inst_name = inst_name.into();
+        self.inst_name = Some(inst_name.into());
     }
 
     ///
@@ -49,7 +52,7 @@ impl VerilogModule {
     ///
     fn to_inst_string(&self) -> Vec<String> {
         let mut res = Vec::new();
-        res.push(format!("{} {} (", self.module_name, self.inst_name));
+        res.push(format!("{} {} (", self.module_name, self.inst_name.as_ref().unwrap()));
 
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports {

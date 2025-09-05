@@ -275,7 +275,7 @@ impl UndefineWireCollector {
 
 
 
-#[derive(Debug, Default, Display)]
+#[derive(Debug, Default, Display, Clone)]
 pub enum PortDir {
     #[strum(to_string = "input")]
     InPort,
@@ -285,6 +285,9 @@ pub enum PortDir {
 
     #[strum(to_string = "inout")]
     InOutPort,
+
+    #[strum(to_string = "unknown")]
+    Unknown,
 }
 
 impl PortDir {
