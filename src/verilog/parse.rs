@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use sv_parser::{parse_sv, unwrap_node, Define, Defines, ModuleDeclarationAnsi, PortDeclaration, RefNode, SyntaxTree};
 use crate::verilog::module::VerilogModule;
@@ -67,6 +69,10 @@ impl VerilogParser {
         }
         log::info!("start extract module");
         let tree = self.parse_res.as_ref().unwrap();
+
+        let mut file = File::create("dump.tree").unwrap();
+        writeln!(file, "{}", tree).unwrap();
+
         for node in tree {
             match node {
                 RefNode::ModuleDeclarationNonansi(module_node) => {
@@ -98,10 +104,6 @@ impl VerilogParser {
         log::info!("start extract ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter().flatten() {
-            // println!("Node is {}", item);
-            if let RefNode::Locate(t) = item {
-                // println!("locate is {:?}", t);
-            }
             if let RefNode::PortDeclaration(port_dir) = item {
                 println!("        ++++++++");
                 //port direction
@@ -178,7 +180,7 @@ mod test {
             .get_module_info();
         for m in module_info {
             println!("Module ---------------------");
-            println!("{:#?}", m);
+            // println!("{:#?}", m);
             println!("module port number is {}", m.port_list.len())
         }
     }
