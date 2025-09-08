@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use sv_parser::{parse_sv, unwrap_node, Define, Defines, ModuleDeclarationAnsi, PortDeclaration, RefNode, SyntaxTree};
+use sv_parser::{parse_sv, unwrap_node, ConstantExpression, Define, Defines, IntegralNumber, ModuleDeclarationAnsi, PortDeclaration, RefNode, SyntaxTree};
 use crate::verilog::module::VerilogModule;
 use crate::verilog::port::{PortDir, VerilogPort};
+use crate::utils::calculator::StrCalc;
 
 #[derive(Default)]
 struct VerilogParser {
@@ -68,9 +69,10 @@ impl VerilogParser {
             log::error!("cannot extract module");
         }
         log::info!("start extract module");
+
         let tree = self.parse_res.as_ref().unwrap();
 
-        let mut file = File::create("dump.tree").unwrap();
+        let mut file = File::create("dump-tree.txt").unwrap();
         writeln!(file, "{}", tree).unwrap();
 
         for node in tree {
@@ -103,17 +105,16 @@ impl VerilogParser {
     fn extract_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
         log::info!("start extract ports");
         let mut port_list = Vec::new();
-        for item in module_node.into_iter().flatten() {
+        for item in module_node.into_iter() {
             if let RefNode::PortDeclaration(port_dir) = item {
-                println!("        ++++++++");
                 //port direction
                 let inout = Self::get_direction(port_dir);
 
                 //port width
-                let width = 1;  //TODO  self.get_port_width()
+                let width = self.get_port_width(RefNode::from(port_dir)).unwrap_or_default();
 
                 // port name
-                for port_node in unwrap_node!(RefNode::from(port_dir), ListOfPortIdentifiers).into_iter().flatten() {
+                for port_node in unwrap_node!(port_dir, ListOfPortIdentifiers).into_iter().flatten() {
                     if let RefNode::PortIdentifier(t) = port_node {
                         let port_name = self.get_identifier_string(RefNode::from(t))
                             .unwrap_or_else(|| {
@@ -130,13 +131,68 @@ impl VerilogParser {
                 }
             }
         }
+        log::info!("end extract ports");
         port_list
     }
 
 
     fn get_port_width(&self, port_node: RefNode) -> Option<usize> {
-        todo!()
+        log::info!("extract port width");
+        if let Some(range) = unwrap_node!(port_node, PackedDimension) {
+            log::info!("find node {:?}", range);
+            if let Some(RefNode::ConstantRange(range)) = unwrap_node!(range, ConstantRange) {
+                let upper = self.extract_expr(&range.nodes.0)
+                    .calculate();
+                let lower = self.extract_expr(&range.nodes.2)
+                    .calculate();
+
+                log::info!("port range upper: {:?} and lower: {:?}", upper, lower);
+
+                Some(upper - lower + 1)
+            } else {
+                log::info!("cannot find node ConstantRange");
+                None
+            }
+
+        } else {
+            Some(1)
+        }
     }
+
+    fn extract_expr(&self, expr: &ConstantExpression) -> String {
+        match unwrap_node!(expr, ConstantPrimary, ConstantExpressionBinary, ConstantExpressionUnary, ConstantExpressionTernary) {
+            Some(RefNode::ConstantPrimary(t)) => {
+                self.get_literal_string(RefNode::from(t)).unwrap_or_else(
+                    || {
+                        log::info!("Cannot extract ConstantPrimary");
+                        "".into()
+                    }
+                )
+            }
+            Some(RefNode::ConstantExpressionBinary(t)) => {
+                let left = self.extract_expr(&t.nodes.0);
+                let right = self.extract_expr(&t.nodes.3);
+                let op = self.get_operator_string(RefNode::from(&t.nodes.1)).unwrap_or_else(||{
+                    log::error!("Can not extract operator");
+                    "".into()
+                });
+                format!("{}{}{}", left, op, right)
+            }
+            Some(RefNode::ConstantExpressionUnary(t)) => {
+                log::info!("Not Support ConstantExpressionUnary");
+                "".into()
+            }
+            Some(RefNode::ConstantExpressionTernary(t)) => {
+                log::info!("Not Support ConstantExpressionTernary");
+                "".into()
+            }
+            _ => {
+                log::info!("Not Support Expression");
+                "".into()
+            }
+        }
+    }
+
     fn get_direction(dir: &PortDeclaration) -> PortDir {
         match dir {
             PortDeclaration::Inout(_) => PortDir::InOutPort,
@@ -146,6 +202,70 @@ impl VerilogParser {
             PortDeclaration::Interface(_) => PortDir::Unknown,
         }
     }
+
+    fn get_literal_string(&self, node:RefNode) -> Option<String> {
+        match unwrap_node!(node, DecimalNumber, BinaryNumber, HexNumber, OctalNumber) {
+            Some(RefNode::DecimalNumber(n)) => {self.get_dec_number_string(RefNode::from(n))},
+            Some(RefNode::BinaryNumber(n)) => {self.get_bin_number_string(RefNode::from(n))},
+            Some(RefNode::HexNumber(n)) => {self.get_hex_number_string(RefNode::from(n))},
+            Some(RefNode::OctalNumber(n)) => {
+                log::info!("cannot support OctalNumber");
+                None
+            }
+            _ => {None}
+        }
+    }
+
+    fn get_operator_string(&self, node: RefNode) -> Option<String> {
+        if let Some(RefNode::BinaryOperator(t)) = unwrap_node!(node, BinaryOperator) {
+            let locate = t.nodes.0.nodes.0;
+            self.parse_res
+                .as_ref()
+                .unwrap()
+                .get_str(&locate)
+                .map(|s| s.to_string())
+        } else { None }
+    }
+
+    fn get_dec_number_string(&self, node:RefNode) -> Option<String> {
+        if let Some(RefNode::UnsignedNumber(number)) = unwrap_node!(node, UnsignedNumber) {
+            let locate = number.nodes.0;
+            self.parse_res
+                .as_ref()
+                .unwrap()
+                .get_str(&locate)
+                .map(|s| s.to_string())
+        } else { None }
+    }
+
+    fn get_bin_number_string(&self, node:RefNode) -> Option<String> {
+        if let Some(RefNode::BinaryNumber(number)) = unwrap_node!(node, BinaryNumber) {
+            let locate = number.nodes.2.nodes.0;
+            self.parse_res
+                .as_ref()
+                .unwrap()
+                .get_str(&locate)
+                .map(|s| format!("{}", i32::from_str_radix(s, 2).unwrap_or_else(|e| {
+                    log::error!("Can not extract binary number: {}", e);
+                    1
+                })))
+        } else { None }
+    }
+
+    fn get_hex_number_string(&self, node:RefNode) -> Option<String> {
+        if let Some(RefNode::HexNumber(number)) = unwrap_node!(node, HexNumber) {
+            let locate = number.nodes.2.nodes.0;
+            self.parse_res
+                .as_ref()
+                .unwrap()
+                .get_str(&locate)
+                .map(|s| format!("{}", i32::from_str_radix(s, 16).unwrap_or_else(|e| {
+                    log::error!("Can not extract hex number: {}", e);
+                    1
+                })))
+        } else { None }
+    }
+
     fn get_identifier_string(&self, node:RefNode) -> Option<String> {
         let locate = match unwrap_node!(node, SimpleIdentifier, EscapedIdentifier) {
             Some(RefNode::SimpleIdentifier(x)) => {
@@ -156,12 +276,10 @@ impl VerilogParser {
             }
             _ => None,
         }?;
-        let t= self.parse_res
+        self.parse_res
             .as_ref()
             .unwrap()
-            .get_str(&locate);
-        println!("        ****{}", t.unwrap());
-        t
+            .get_str(&locate)
             .map(|s| s.to_string())
     }
 
@@ -180,7 +298,7 @@ mod test {
             .get_module_info();
         for m in module_info {
             println!("Module ---------------------");
-            // println!("{:#?}", m);
+            println!("{:#?}", m);
             println!("module port number is {}", m.port_list.len())
         }
     }

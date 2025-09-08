@@ -1,7 +1,12 @@
-module driver (in1, in2, out, en);
+
+`define range 2'b10:0
+
+module driver (in1, in2, out, en, test1, test2);
 input wire [3-1:0] in1, in2;
 output reg [3:0] out;
 input en;
+input [`range] test1;
+input [4'hf:0] test2;
 bufif0 ar[3:0] (out, in, en); // array of three-state buffers
 endmodule
 

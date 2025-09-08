@@ -1,2 +1,2 @@
 pub mod solve_func;
-mod calculator;
+pub mod calculator;
