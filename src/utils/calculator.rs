@@ -292,15 +292,15 @@ impl<'a> Iterator for Tokenizer<'a> {
 }
 
 pub trait StrCalc {
-    fn calculate(&self) ->usize;
+    fn calculate(&self) ->Result<usize, String>;
 }
 
 impl StrCalc for String {
-    fn calculate(&self) -> usize {
+    fn calculate(&self) -> Result<usize, String> {
         let mut parser = Parser::new(self).unwrap_or_else(|e| panic!("{}", e));
         let ast = parser.parse().unwrap_or_else(|e| panic!("{}", e));
 
-        usize::try_from(ast.eval()).unwrap()
+        usize::try_from(ast.eval()).map_err(|e| format!("{}", e))
     }
 
 }

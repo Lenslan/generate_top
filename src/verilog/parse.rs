@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::{stdout, Write};
 use std::path::PathBuf;
-use sv_parser::{parse_sv, unwrap_node, ConstantExpression, Define, Defines, IntegralNumber, ModuleDeclarationAnsi, PortDeclaration, RefNode, SyntaxTree};
+use sv_parser::{parse_sv, unwrap_node, ConstantExpression, Define, Defines, IntegralNumber, ModuleDeclarationAnsi, PortDeclaration, PortDirection, RefNode, SyntaxTree};
 use crate::verilog::module::VerilogModule;
 use crate::verilog::port::{PortDir, VerilogPort};
 use crate::utils::calculator::StrCalc;
@@ -72,8 +72,11 @@ impl VerilogParser {
 
         let tree = self.parse_res.as_ref().unwrap();
 
-        let mut file = File::create("dump-tree.txt").unwrap();
-        writeln!(file, "{}", tree).unwrap();
+        #[cfg(debug_assertions)]
+        {
+            let mut file = File::create("dump-tree.txt").unwrap();
+            writeln!(file, "{}", tree).unwrap();
+        }
 
         for node in tree {
             match node {
@@ -93,8 +96,19 @@ impl VerilogParser {
 
 
                 },
-                RefNode::ModuleDeclarationAnsi(module) => {
-                    todo!()
+                RefNode::ModuleDeclarationAnsi(module_node) => {
+                    let module_id_node = unwrap_node!(module_node, ModuleIdentifier).unwrap();
+                    let module_name = self.get_identifier_string(module_id_node.clone()).unwrap_or_else(|| {
+                        log::error!("Can not extract module name");
+                        "".into()
+                    });
+                    let mut module = VerilogModule::new(module_name);
+                    module.add_ports(self.extract_ansi_ports(RefNode::from(module_node)));
+
+                    // TODO add inst
+
+                    // add module
+                    self.module_info.push(module);
                 },
                 _ => {}
             }
@@ -135,6 +149,42 @@ impl VerilogParser {
         port_list
     }
 
+    fn extract_ansi_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
+        log::info!("start extract ansi ports");
+        let mut port_list = Vec::new();
+        for item in module_node.into_iter() {
+            if let RefNode::AnsiPortDeclaration(port_dir) = item {
+                let inout = if let Some(RefNode::PortDirection(dir)) = unwrap_node!(port_dir, PortDirection) {
+                    Self::get_ansi_direction(dir)
+                } else {
+                    log::error!("Can not extract ansi port direction");
+                    PortDir::Unknown
+                };
+
+                let width = self.get_port_width(RefNode::from(port_dir)).unwrap_or_default();
+
+                let port_name = if let Some(id) = unwrap_node!(port_dir, PortIdentifier) {
+                    self.get_identifier_string(id).unwrap_or_else(|| {
+                        log::warn!("Can not extract port name");
+                        "".into()
+                    })
+                } else {
+                    log::error!("Can not extract ansi port name");
+                    "".into()
+                };
+
+                let port_inst = VerilogPort::new(
+                    inout,
+                    &port_name,
+                    width,
+                );
+                port_list.push(port_inst);
+
+            }
+        }
+        port_list
+    }
+
 
     fn get_port_width(&self, port_node: RefNode) -> Option<usize> {
         log::info!("extract port width");
@@ -147,8 +197,19 @@ impl VerilogParser {
                     .calculate();
 
                 log::info!("port range upper: {:?} and lower: {:?}", upper, lower);
+                if upper.is_ok() && lower.is_ok() {
+                    Some(upper.unwrap() - lower.unwrap() + 1)
+                } else {
+                    if upper.is_err() {
+                        log::warn!("Port upper is {}", upper.unwrap_err());
+                    }
+                    if lower.is_err() {
+                        log::warn!("Port lower is {}", lower.unwrap_err());
+                    }
+                    None
 
-                Some(upper - lower + 1)
+                }
+
             } else {
                 log::info!("cannot find node ConstantRange");
                 None
@@ -200,6 +261,15 @@ impl VerilogParser {
             PortDeclaration::Output(_) => PortDir::OutPort,
             PortDeclaration::Ref(_) => PortDir::Unknown,
             PortDeclaration::Interface(_) => PortDir::Unknown,
+        }
+    }
+
+    fn get_ansi_direction(dir: &PortDirection) -> PortDir {
+        match dir {
+            PortDirection::Input(_) => {PortDir::InPort}
+            PortDirection::Output(_) => {PortDir::OutPort}
+            PortDirection::Inout(_) => {PortDir::InOutPort}
+            PortDirection::Ref(_) => {PortDir::Unknown}
         }
     }
 
@@ -292,7 +362,7 @@ mod test {
     #[test]
     fn test_base() {
         simple_logger::init_with_level(log::Level::Info).unwrap();
-        let module_info = VerilogParser::new("./test/std-7.1.6-primitives.v".into())
+        let module_info = VerilogParser::new("./test/npu_afifo_r.sv".into())
             .parse()
             .solve()
             .get_module_info();
