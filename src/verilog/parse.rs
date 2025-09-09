@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{stdout, Write};
+use std::io::{Write};
 use std::path::PathBuf;
 use sv_parser::{parse_sv, unwrap_node, ConstantExpression, Define, Defines, IntegralNumber, ModuleDeclarationAnsi, PortDeclaration, PortDirection, RefNode, SyntaxTree};
 use crate::verilog::module::VerilogModule;
@@ -8,7 +8,7 @@ use crate::verilog::port::{PortDir, VerilogPort};
 use crate::utils::calculator::StrCalc;
 
 #[derive(Default)]
-struct VerilogParser {
+pub struct VerilogParser {
     file: PathBuf,
     defines: HashMap<String, Option<Define>>,
     includes: Vec<PathBuf>,

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use crate::verilog::port::{PortDir, VerilogPort};
+use crate::verilog::wire::WireBuilder;
 
-
-const INST_NAME_LEN:u8 = 20;
-const INST_SIGNAL_LEN:u8 = 20;
+const INST_NAME_LEN:u8 = 30;
+const INST_SIGNAL_LEN:u8 = 30;
 #[derive(Default, Debug)]
 pub struct VerilogModule {
     module_name: String,
@@ -57,9 +57,8 @@ impl VerilogModule {
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports {
                 res.push(format!("    .{}, {}", port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN), port.info));
-                todo!()
             }
-            res.push(format!("    .{}); {}", last_port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN), last_port.info));
+            res.push(format!("    .{}\n); {}", last_port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN), last_port.info));
         } else {
             log::error!("There is no port in module {}", self.module_name);
         }
@@ -72,28 +71,68 @@ impl VerilogModule {
         res.push(format!("{} (", self.module_name));
 
         indent += 4;
+
+        // port info
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in self.port_list.iter() {
-                res.push(format!("{indent_space}{inout} wire [0:{width}] {name},",
+                res.push(format!("{indent_space}{inout} wire [{width}:0] {name},",
                                  indent_space=" ".repeat(indent),
                                  inout=port.inout,
                                  width=port.width,
                                  name=port.name))
             }
-            res.push(format!("{indent_space}{inout} wire [0:{width}] {name});",
+            res.push(format!("{indent_space}{inout} wire [{width}:0] {name});",
                              indent_space=" ".repeat(indent),
                              inout=last_port.inout,
                              width=last_port.width,
                              name=last_port.name))
         }
-        // 线网的定义  TODO
 
+        // wire definition
+        let s = WireBuilder::traverse_unport_wires()
+            .iter().map(|(width, name)| {
+            format!("{}wire {:<20} {}",
+                " ".repeat(indent),
+                format!("[{}:0]", width-1),
+                name
+            )
+        })
+            .collect::<Vec<String>>();
+        res.extend(s);
+
+        // inst info
         for inst in self.inst_list.iter() {
             res.extend(inst.to_inst_string());
             res.push("\n\n".into());
         }
         res.push("endmodule".into());
 
-        todo!()
+        res
+
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::verilog::module::VerilogModule;
+    use crate::verilog::port::{PortDir, VerilogPort};
+
+    #[test]
+    fn test_inst_string() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let mut module = VerilogModule::new("test".to_string());
+        module.fix_inst_name("u_test_module");
+        let mut port1 = VerilogPort::new(PortDir::InPort, "port1", 12);
+        port1.set_info_msg("test1 info message");
+        port1.connect_partial_signal("wire1", &(0..4));
+        port1.connect_partial_signal("wire2", &(0..5));
+        port1.connect_partial_signal("wire3", &(0..3));
+        println!("{:?}", port1.signals);
+        let mut port2 = VerilogPort::new(PortDir::InPort, "port2", 12);
+        port2.connect_undefined_signal("undefined-wires");
+        let mut port3 = VerilogPort::new(PortDir::OutPort, "pordddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddt3", 12);
+        port3.connect_number_signal(43, 8);
+        module.add_ports(vec![port1, port2, port3]);
+        println!("{}", module.to_inst_string().join("\n"));
     }
 }

@@ -297,8 +297,8 @@ pub trait StrCalc {
 
 impl StrCalc for String {
     fn calculate(&self) -> Result<usize, String> {
-        let mut parser = Parser::new(self).unwrap_or_else(|e| panic!("{}", e));
-        let ast = parser.parse().unwrap_or_else(|e| panic!("{}", e));
+        let mut parser = Parser::new(self).map_err(|e| format!("{}", e))?;
+        let ast = parser.parse().map_err(|e| format!("{:?}", e))?;
 
         usize::try_from(ast.eval()).map_err(|e| format!("{}", e))
     }

@@ -1,6 +1,7 @@
-use std::{sync::Arc, vec};
+use std::{fmt, sync::Arc, vec};
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt::format;
 use std::ops::Range;
 use std::sync::{LazyLock, Mutex};
 use strum::Display;
@@ -16,7 +17,7 @@ pub struct VerilogPort {
 
     pub info: String,
 
-    signals: Vec<VerilogValue>,
+    pub signals: Vec<VerilogValue>,
     has_undefine: u8,
     undefine_wires_idx: Vec<(usize,usize)>,
 
@@ -36,7 +37,15 @@ impl VerilogPort {
     }
 
     pub fn set_info_msg(&mut self, msg: &str) {
-        self.info = String::from(msg);
+        self.info = format!("// {}", msg)
+    }
+
+    pub fn register_port_as_wire(&self) {
+        match self.inout {
+            PortDir::InPort => WireBuilder::add_driver_wire_asport(&self.name, &(0..self.width)),
+            PortDir::OutPort => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width)),
+            _ => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width))             //TODO how to process inout port
+        };
     }
 
     ///
@@ -56,7 +65,7 @@ impl VerilogPort {
     /// those width will be inferred by `set_undefine_wire`
     /// or `solve_func`
     ///
-    fn connect_undefined_signal(&mut self, sig: &str) {
+    pub fn connect_undefined_signal(&mut self, sig: &str) {
         self.signals.push(VerilogValue::UndefinedWire(sig.into()));
         self.has_undefine += 1;
     }
@@ -64,7 +73,7 @@ impl VerilogPort {
     ///
     /// register wires whose width is declared
     ///
-    fn connect_partial_signal(&mut self, sig: &str, range: &Range<usize>){
+    pub fn connect_partial_signal(&mut self, sig: &str, range: &Range<usize>){
         let wire = self.connect_wire(sig, range);
         self.signals.push(Wire(Arc::clone(&wire), range.clone()));
     }
@@ -72,7 +81,7 @@ impl VerilogPort {
     ///
     /// register const number which connected to this port
     ///
-    fn connect_number_signal(&mut self, num_val: u128, num_bits: u8) {
+    pub fn connect_number_signal(&mut self, num_val: u128, num_bits: u8) {
         self.signals.push(Number {
             width: num_bits,
             value: num_val
@@ -196,7 +205,23 @@ impl VerilogPort {
 
 
     pub fn to_inst_string(&self, name_len: u8, signal_len: u8) -> String {
-        todo!()
+        let signal_string = match self.signals.len() {
+            0|1 => "".into(),
+            2 => self.signals[1].to_string(),
+            _ => {
+                let s = self.signals[1..]
+                    .iter()
+                    .map(|v|v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                format!("{{{}}}", s)
+            }
+        };
+        format!("{:<name_len$} ({:<sig_len$})",
+                self.name,
+                signal_string,
+                name_len=name_len as usize,
+                sig_len=signal_len as usize)
     }
 
     pub fn to_port_string(&self) -> String {
@@ -306,8 +331,9 @@ impl PortDir {
     }
 }
 
+
 #[derive(Debug, Clone)]
-enum VerilogValue {
+pub enum VerilogValue {
     Wire(Arc<VerilogWire>, Range<usize>),
     UndefinedWire(String),
     Number{
@@ -339,6 +365,15 @@ impl VerilogValue {
             _ => ""
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Wire(wire, range) => {format!("{}[{}:{}]", wire, range.end-1, range.start)}
+            VerilogValue::UndefinedWire(s) => {format!("{}", s)}
+            VerilogValue::Number {width, value} => {format!("{}'d{}", width, value)}
+            VerilogValue::NONE => {"".into()}
+        }
+    }
 }
 
 #[cfg(test)]
@@ -359,9 +394,6 @@ mod test {
 
         println!("{:#?}", port1);
         println!("{:#?}", port2);
-
-        
-
-
     }
+
 }

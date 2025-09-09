@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Range};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -39,6 +40,36 @@ impl WireBuilder {
         let (arc_wire, payload) = wire_builder.wires
             .entry(name.into())
             .or_insert_with(|| {(Arc::new(VerilogWire::new(name.into())), Default::default())});
+        for i in range.clone().into_iter() {
+            payload.load.insert(i);
+        }
+        Arc::clone(arc_wire)
+    }
+
+    ///
+    /// register wire which connected to output port
+    ///
+    pub fn add_driver_wire_asport(name:&str, range: &Range<usize>) -> Arc<VerilogWire> {
+        let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        let (arc_wire, payload) = wire_builder.wires
+            .entry(name.into())
+            .or_insert_with(|| {(Arc::new(VerilogWire::new_port(name.into())), Default::default())});
+        for i in range.clone().into_iter() {
+            if !payload.driver.insert(i) {
+                log::error!("wire {} has multi driver", name)
+            }
+        }
+        Arc::clone(arc_wire)
+    }
+
+    ///
+    /// register wire which connected to input port
+    ///
+    pub fn add_load_wire_asport(name: &str, range: &Range<usize>) -> Arc<VerilogWire> {
+        let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        let (arc_wire, payload) = wire_builder.wires
+            .entry(name.into())
+            .or_insert_with(|| {(Arc::new(VerilogWire::new_port(name.into())), Default::default())});
         for i in range.clone().into_iter() {
             payload.load.insert(i);
         }
@@ -101,14 +132,63 @@ impl WireBuilder {
         let res = &wire_builder.wires;
         println!("{:#?}", res)
     }
+
+    ///
+    /// clear HashMap of current Module
+    ///
+    pub fn clear() {
+        let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        wire_builder.wires = HashMap::new();
+    }
+
+    ///
+    /// traversial wires
+    /// 
+    pub fn traverse_unport_wires() -> Vec<(usize, String)> {
+        let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        let mut res = Vec::new();
+        for item in wire_builder.wires.values() {
+            if item.0.need_declaration() {
+                let name = item.0.name.clone();
+                let width = WireBuilder::get_width(&name);
+                res.push((width, name));
+            }
+        }
+        res
+    }
 }
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VerilogWire {
     pub(crate) name: String,
+    port_tag: bool
 }
 impl VerilogWire {
     fn new(name: String) -> Self {
-        Self { name }
+        Self {
+            name ,
+            port_tag: false
+        }
+    }
+
+    fn new_port(name: String) -> Self {
+        Self {
+            name,
+            port_tag: true
+        }
+    }
+
+    pub fn need_declaration(&self) -> bool {
+        !self.port_tag
+    }
+
+    fn set_port_tag(&mut self, port_tag: bool) {
+        self.port_tag = port_tag;
+    }
+}
+
+impl fmt::Display for VerilogWire {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 
