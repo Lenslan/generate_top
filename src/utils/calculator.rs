@@ -1,7 +1,7 @@
+use rust_decimal::{Decimal, MathematicalOps};
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 use std::str::Chars;
-use rust_decimal::{Decimal, MathematicalOps};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
@@ -37,7 +37,7 @@ pub enum CalcError {
     #[error("非法字符: {0}")]
     UnexpectedChar(char),
     #[error("无效运算符: {0}")]
-    InvalidOperator(String)
+    InvalidOperator(String),
 }
 
 pub struct Parser<'a> {
@@ -48,9 +48,9 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn new(expression: &'a str) -> CalcResult<Self> {
         let mut tokenizer = Tokenizer::new(expression);
-        let current_token = tokenizer.next().ok_or_else(|| {
-            CalcError::UnexpectedChar(tokenizer.get_unexpected_char().unwrap())
-        })?;
+        let current_token = tokenizer
+            .next()
+            .ok_or_else(|| CalcError::UnexpectedChar(tokenizer.get_unexpected_char().unwrap()))?;
 
         Ok(Parser {
             tokenizer,
@@ -109,7 +109,7 @@ impl<'a> Parser<'a> {
                 let right_expr = self.parse_expression(OperatorPrecedence::Power)?;
                 Ok(Node::Power(Box::new(left_expr), Box::new(right_expr)))
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
@@ -130,37 +130,31 @@ impl<'a> Parser<'a> {
 
                 if self.current_token != Token::RightParen {
                     if self.current_token == Token::EOF {
-                        return Err(
-                            CalcError::InvalidOperator(
-                                String::from("不完整的运算表达式")
-                            )
-                        );
+                        return Err(CalcError::InvalidOperator(String::from(
+                            "不完整的运算表达式",
+                        )));
                     }
 
-                    return Err(
-                        CalcError::InvalidOperator(
-                            format!("期望 ')', 但是遇到 '{}'", self.current_token)
-                        )
-                    );
+                    return Err(CalcError::InvalidOperator(format!(
+                        "期望 ')', 但是遇到 '{}'",
+                        self.current_token
+                    )));
                 }
 
                 self.next_token()?;
                 Ok(expr)
-            },
+            }
             _ => {
                 if self.current_token == Token::EOF {
-                    return Err(
-                        CalcError::InvalidOperator(
-                            String::from("不完整的运算表达式")
-                        )
-                    );
+                    return Err(CalcError::InvalidOperator(String::from(
+                        "不完整的运算表达式",
+                    )));
                 }
 
-                Err(
-                    CalcError::InvalidOperator(
-                        format!("期望数字或表达式, 但是遇到 '{}'", self.current_token)
-                    )
-                )
+                Err(CalcError::InvalidOperator(format!(
+                    "期望数字或表达式, 但是遇到 '{}'",
+                    self.current_token
+                )))
             }
         }
     }
@@ -176,19 +170,19 @@ pub enum Token {
     LeftParen,
     RightParen,
     Number(Decimal),
-    EOF
+    EOF,
 }
 
 impl Token {
     pub fn get_precedence(&self) -> OperatorPrecedence {
-        use Token::*;
         use OperatorPrecedence::*;
+        use Token::*;
 
         match self {
             Add | Subtract => AddOrSubtract,
             Multiply | Divide => MultiplyOrDivide,
             Caret => Power,
-            _ => Default
+            _ => Default,
         }
     }
 }
@@ -206,7 +200,7 @@ impl Display for Token {
             LeftParen => write!(f, "("),
             RightParen => write!(f, ")"),
             Number(n) => write!(f, "{}", n),
-            EOF => write!(f, "EOF")
+            EOF => write!(f, "EOF"),
         }
     }
 }
@@ -217,7 +211,7 @@ pub enum OperatorPrecedence {
     AddOrSubtract,
     MultiplyOrDivide,
     Power,
-    Negative
+    Negative,
 }
 
 pub struct Tokenizer<'a> {
@@ -292,7 +286,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 }
 
 pub trait StrCalc {
-    fn calculate(&self) ->Result<usize, String>;
+    fn calculate(&self) -> Result<usize, String>;
 }
 
 impl StrCalc for String {
@@ -302,13 +296,12 @@ impl StrCalc for String {
 
         usize::try_from(ast.eval()).map_err(|e| format!("{}", e))
     }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use rust_decimal::dec;
     use super::*;
+    use rust_decimal::dec;
 
     #[test]
     fn test_calculate() {
