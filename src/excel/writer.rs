@@ -113,6 +113,8 @@ impl ExcelWriter {
             .set_border_bottom(FormatBorder::Medium)
             .set_border_top(FormatBorder::Medium)
             .set_background_color(Color::Gray);
+        let number_format = Format::new()
+            .set_align(FormatAlign::Left);
         let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-info"];
         let width_list = [30, 10, 10, 30, 40];
 
@@ -125,7 +127,7 @@ impl ExcelWriter {
         for (idx, port) in module.port_list.iter().enumerate() {
             sheet.write((idx + 1) as RowNum, 0, &port.name).unwrap();
             sheet.write((idx + 1) as RowNum, 1, format!("{}", port.inout)).unwrap();
-            sheet.write((idx + 1) as RowNum, 2, format!("{}", port.width)).unwrap();
+            sheet.write_with_format((idx + 1) as RowNum, 2, port.width as u32, &number_format).unwrap();
             sheet.write((idx + 1) as RowNum, 3, port.get_signal_string()
                 .replace('{',"")
                 .replace('}',"")
@@ -133,6 +135,8 @@ impl ExcelWriter {
             sheet.write((idx + 1) as RowNum, 4, &port.info).unwrap();
             sheet.set_row_height((idx + 1) as RowNum, 16).unwrap();
         }
+
+        sheet.set_freeze_panes(1, 0).unwrap();
         sheet
     }
 
