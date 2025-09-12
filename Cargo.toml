@@ -14,3 +14,4 @@ sv-parser = "0.13.3"
 rust_decimal = { version = "1.37.1", features = ["macros", "maths"] }
 thiserror = "1.0.69"
 walkdir = "2.5.0"
+rust_xlsxwriter = "0.90.0"

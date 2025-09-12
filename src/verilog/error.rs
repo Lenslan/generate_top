@@ -1,5 +1,4 @@
 use thiserror::Error;
-use crate::verilog::VerilogBase;
 
 #[derive(Debug, Error)]
 pub enum WireError {
@@ -9,30 +8,28 @@ pub enum WireError {
     Unload(String, usize),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum PortError {
-    #[error("Port Error => wire {0}")]
     Error1(
-        #[from] WireError
-    ),
+        String,
+        Vec<WireError>
+    )
 }
-
-
 
 
 #[cfg(test)]
 mod test {
-    use anyhow::{bail, Context};
     use crate::verilog::error::{PortError, WireError};
     use crate::verilog::error::WireError::UnDriver;
 
     #[test]
     fn test_error_delver() {
-        fn raise_wire_error() -> anyhow::Result<()> {
-            bail!(WireError::UnDriver("wire1".into(), 12))
+        fn raise_wire_error() -> Result<(), WireError> {
+            Err(UnDriver("test_wire".to_string(), 0))
         }
-        fn test_main() -> anyhow::Result<()> {
-            raise_wire_error().with_context(|e| {})?;
+        fn test_main() -> Result<(), PortError> {
+            let mut err_collector = Vec::new();
+            raise_wire_error().map_err(|e|err_collector.push(e)).unwrap();
             Ok(())
         }
         match test_main() {

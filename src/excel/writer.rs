@@ -1,6 +1,7 @@
 use crate::excel::reader::ExcelReader;
 use std::path::PathBuf;
 use std::sync::Arc;
+use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, RowNum, Workbook, Worksheet};
 use walkdir::WalkDir;
 use crate::verilog::module::VerilogModule;
 use crate::verilog::parse::VerilogParser;
@@ -28,6 +29,10 @@ impl ExcelWriter {
             .and_then(|s| s.to_str())
             .expect("Could not get module name");
 
+        let mut workbook = Workbook::new();
+        let excel_name = parent_path.join(format!("{}.xlsx", module_name));
+        log::debug!("start generate excel file {}", excel_name.display());
+
         UndefineWireCollector::clear();
         WireBuilder::clear();
         let mut module = VerilogModule::new(module_name.into());
@@ -42,14 +47,26 @@ impl ExcelWriter {
         }
         
         // 遍历wire builder 将所有没有驱动/没有load的信号连接到端口
+        for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
+            module.add_port(inout, &name, width as u32)
+        }
+
+        // write excel
+        workbook.push_worksheet(self.add_inst_sheet(&module));
+        for item in module.inst_list.iter() {
+            workbook.push_worksheet(self.add_inst_sheet(item));
+        }
+        workbook.save(excel_name).unwrap();
     }
 
     fn generate_or_update(&self) {}
 
     fn traverse_v(&mut self) {
+        log::debug!("Traversing verilog files in dir {}", self.module_dir_path.display());
         let mut dir_list = Vec::new();
         let mut excel_list = Vec::new();
         for entry in WalkDir::new(&self.module_dir_path)
+            .min_depth(1)
             .into_iter()
             .filter_map(|e| e.ok())
         {
@@ -67,6 +84,7 @@ impl ExcelWriter {
         }
 
         for d in dir_list {
+            log::debug!("dir list is  {}", d.display());
             ExcelWriter::new(d.clone()).generate_or_update();
             let parent = d.parent().expect("Can not get parent name");
             let file_name = d
@@ -78,5 +96,59 @@ impl ExcelWriter {
             let file_v = parent.join(format!("{}.v", file_name));
             self.file_list.push(file_v)
         }
+
+        // debug
+        for item in self.file_list.iter() {
+            log::debug!("file list is {}", item.display());
+        }
+    }
+
+    // TODO how to write inst name
+    fn add_inst_sheet(&self, module: &VerilogModule) -> Worksheet {
+        let mut sheet = Worksheet::new();
+        let header_format = Format::new()
+            .set_bold()
+            .set_font_size(16)
+            .set_align(FormatAlign::Center)
+            .set_border_bottom(FormatBorder::Medium)
+            .set_border_top(FormatBorder::Medium)
+            .set_background_color(Color::Gray);
+        let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-info"];
+        let width_list = [30, 10, 10, 30, 40];
+
+        sheet.set_name(&module.module_name).unwrap();
+        sheet.set_row_height(0, 20).unwrap();
+        for item in title_list.into_iter().enumerate() {
+            sheet.write_with_format(0, item.0 as ColNum, item.1, &header_format).unwrap();
+            sheet.set_column_width(item.0 as ColNum, width_list[item.0]).unwrap();
+        }
+        for (idx, port) in module.port_list.iter().enumerate() {
+            sheet.write((idx + 1) as RowNum, 0, &port.name).unwrap();
+            sheet.write((idx + 1) as RowNum, 1, format!("{}", port.inout)).unwrap();
+            sheet.write((idx + 1) as RowNum, 2, format!("{}", port.width)).unwrap();
+            sheet.write((idx + 1) as RowNum, 3, port.get_signal_string()
+                .replace('{',"")
+                .replace('}',"")
+            ).unwrap();
+            sheet.write((idx + 1) as RowNum, 4, &port.info).unwrap();
+            sheet.set_row_height((idx + 1) as RowNum, 16).unwrap();
+        }
+        sheet
+    }
+
+
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+    use crate::excel::writer::ExcelWriter;
+
+    #[test]
+    fn test_generate() {
+        simple_logger::init_with_level(log::Level::Debug).unwrap();
+        let mut  writer = ExcelWriter::new(PathBuf::from("./src/excel/test/uart"));
+        writer.traverse_v();
+        writer.generate();
     }
 }

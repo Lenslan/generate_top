@@ -203,7 +203,7 @@ impl VerilogPort {
         };
     }
 
-    pub fn to_inst_string(&self, name_len: u8, signal_len: u8) -> String {
+    pub fn get_signal_string(&self) -> String {
         let signal_string = match self.signals.len() {
             0 | 1 => "".into(),
             2 => self.signals[1].to_string(),
@@ -216,6 +216,11 @@ impl VerilogPort {
                 format!("{{{}}}", s)
             }
         };
+        signal_string
+    }
+
+    pub fn to_inst_string(&self, name_len: u8, signal_len: u8) -> String {
+        let signal_string = self.get_signal_string();
         format!(
             "{:<name_len$} ({:<sig_len$})",
             self.name,
@@ -379,7 +384,11 @@ impl VerilogValue {
     pub fn to_string(&self) -> String {
         match self {
             Wire(wire, range) => {
-                format!("{}[{}:{}]", wire, range.end - 1, range.start)
+                if range.end == 1 {
+                    format!("{}", wire)
+                } else {
+                    format!("{}[{}:{}]", wire, range.end - 1, range.start)
+                }
             }
             VerilogValue::UndefinedWire(s) => {
                 format!("{}", s)

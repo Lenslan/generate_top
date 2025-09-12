@@ -5,6 +5,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::sync::{Arc, LazyLock, Mutex};
+use crate::verilog::port::PortDir;
 
 pub struct WireBuilder {
     wires: HashMap<String, (Arc<VerilogWire>, WirePayload)>,
@@ -102,22 +103,44 @@ impl WireBuilder {
     ///
     /// check wire has driver & load
     ///
-    fn check_driver_load(driver: &HashSet<usize>, load: &HashSet<usize>, name: &str) {
+    // fn check_driver_load(driver: &HashSet<usize>, load: &HashSet<usize>, name: &str) {
+    //     let mut no_driver = load.difference(driver).collect::<Vec<_>>();
+    //     if !no_driver.is_empty() {
+    //         no_driver.sort();
+    //         for bit in no_driver {
+    //             log::error!("wire {}[{}] has load but no driver", name, bit);
+    //         }
+    //     }
+    //
+    //     let mut no_load = driver.difference(load).collect::<Vec<_>>();
+    //     if !no_load.is_empty() {
+    //         no_load.sort();
+    //         for bit in no_load {
+    //             log::warn!("wire {}[{}] has driver but no load", name, bit);
+    //         }
+    //     }
+    // }
+    fn check_undriven(driver: &HashSet<usize>, load: &HashSet<usize>) -> Vec<usize> {
         let mut no_driver = load.difference(driver).collect::<Vec<_>>();
+        let mut res = Vec::new();
         if !no_driver.is_empty() {
             no_driver.sort();
             for bit in no_driver {
-                log::error!("wire {}[{}] has load but no driver", name, bit);
+                res.push(*bit);
             }
         }
-
+        res
+    }
+    fn check_unload(driver: &HashSet<usize>, load: &HashSet<usize>) -> Vec<usize> {
         let mut no_load = driver.difference(load).collect::<Vec<_>>();
+        let mut res = Vec::new();
         if !no_load.is_empty() {
             no_load.sort();
             for bit in no_load {
-                log::warn!("wire {}[{}] has driver but no load", name, bit);
+                res.push(*bit);
             }
         }
+        res
     }
 
     ///
@@ -128,7 +151,15 @@ impl WireBuilder {
         log::info!("WireBuilder health check start >>>>");
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         for (wire, payload) in wire_builder.wires.values() {
-            Self::check_driver_load(&payload.driver, &payload.load, &wire.name);
+            // Self::check_driver_load(&payload.driver, &payload.load, &wire.name);
+            let undriven = Self::check_undriven(&payload.driver, &payload.load);
+            let unload = Self::check_unload(&payload.driver, &payload.load);
+            for bit in undriven {
+                log::error!("wire {}[{}] has load but no driver", wire.name, bit);
+            }
+            for bit in unload {
+                log::warn!("wire {}[{}] has driver but no load", wire.name, bit);
+            }
         }
         log::info!("WireBuilder health check end  <<<<");
     }
@@ -151,7 +182,7 @@ impl WireBuilder {
     }
 
     ///
-    /// traversial wires
+    /// traverse to find wires which need to be declared
     ///
     pub fn traverse_unport_wires() -> Vec<(usize, String)> {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
@@ -164,6 +195,25 @@ impl WireBuilder {
             }
         }
         res
+    }
+
+    pub fn traverse_unload_undriven() -> Vec<(PortDir, usize, String)> {
+        let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        let mut res = Vec::new();
+        for (wire, payload) in wire_builder.wires.values() {
+            let undriven = Self::check_undriven(&payload.driver, &payload.load);
+            let unload = Self::check_unload(&payload.driver, &payload.load);
+            if undriven.len() > 0 {
+                res.push((PortDir::InPort, undriven.len(), wire.name.clone()));
+                continue;
+            }
+            if unload.len() > 0 {
+                res.push((PortDir::OutPort, unload.len(), wire.name.clone()))
+            }
+        }
+
+        res
+
     }
 }
 #[derive(Debug, Default)]

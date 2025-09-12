@@ -7,10 +7,10 @@ const INST_NAME_LEN: u8 = 30;
 const INST_SIGNAL_LEN: u8 = 30;
 #[derive(Default, Debug)]
 pub struct VerilogModule {
-    module_name: String,
-    inst_name: Option<String>,
+    pub module_name: String,
+    pub inst_name: Option<String>,
     pub port_list: Vec<VerilogPort>,
-    inst_list: Vec<Arc<VerilogModule>>,
+    pub inst_list: Vec<Arc<VerilogModule>>,
 }
 impl VerilogModule {
     pub fn new(module_name: String) -> Self {
