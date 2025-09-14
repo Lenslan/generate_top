@@ -350,6 +350,18 @@ impl PortDir {
     }
 }
 
+impl From<&String> for PortDir {
+    fn from(value: &String) -> Self {
+        let value = value.as_str();
+        match value {
+            "input" => Self::InPort,
+            "output" => Self::OutPort,
+            "inout" => Self::InOutPort,
+            _ => Self::Unknown
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum VerilogValue {
     Wire(Arc<VerilogWire>, Range<usize>),

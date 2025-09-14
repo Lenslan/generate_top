@@ -119,24 +119,29 @@ impl ExcelWriter {
         let width_list = [30, 10, 10, 30, 40];
 
         sheet.set_name(&module.module_name).unwrap();
-        sheet.set_row_height(0, 20).unwrap();
+        sheet.set_row_height(0, 18).unwrap();
+        sheet.set_row_height(1, 20).unwrap();
+
+        sheet.write(0, 0, "Module Inst Name").unwrap();
+        sheet.write(0, 1, format!("{}", module.inst_name.as_deref().unwrap_or_default())).unwrap();
+
         for item in title_list.into_iter().enumerate() {
-            sheet.write_with_format(0, item.0 as ColNum, item.1, &header_format).unwrap();
+            sheet.write_with_format(1, item.0 as ColNum, item.1, &header_format).unwrap();
             sheet.set_column_width(item.0 as ColNum, width_list[item.0]).unwrap();
         }
         for (idx, port) in module.port_list.iter().enumerate() {
-            sheet.write((idx + 1) as RowNum, 0, &port.name).unwrap();
-            sheet.write((idx + 1) as RowNum, 1, format!("{}", port.inout)).unwrap();
-            sheet.write_with_format((idx + 1) as RowNum, 2, port.width as u32, &number_format).unwrap();
-            sheet.write((idx + 1) as RowNum, 3, port.get_signal_string()
+            sheet.write((idx + 2) as RowNum, 0, &port.name).unwrap();
+            sheet.write((idx + 2) as RowNum, 1, format!("{}", port.inout)).unwrap();
+            sheet.write_with_format((idx + 2) as RowNum, 2, port.width as u32, &number_format).unwrap();
+            sheet.write((idx + 2) as RowNum, 3, port.get_signal_string()
                 .replace('{',"")
                 .replace('}',"")
             ).unwrap();
-            sheet.write((idx + 1) as RowNum, 4, &port.info).unwrap();
-            sheet.set_row_height((idx + 1) as RowNum, 16).unwrap();
+            sheet.write((idx + 2) as RowNum, 4, &port.info).unwrap();
+            sheet.set_row_height((idx + 2) as RowNum, 16).unwrap();
         }
 
-        sheet.set_freeze_panes(1, 0).unwrap();
+        sheet.set_freeze_panes(2, 0).unwrap();
         sheet
     }
 
