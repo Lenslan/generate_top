@@ -243,6 +243,14 @@ impl VerilogBase for VerilogPort {
         self.name.clone()
     }
 }
+
+impl PartialEq for VerilogPort {
+    fn eq(&self, other: &Self) -> bool {
+        (self.inout == other.inout)
+            && (self.width == other.width)
+            && (self.name == other.name)
+    }
+}
 #[derive(Default)]
 pub struct UndefineWireCollector {
     wires: HashMap<String, usize>,
@@ -281,6 +289,7 @@ impl UndefineWireCollector {
     /// call this function after all the port are connected
     ///
     pub fn solve_func() {
+        log::debug!("Solve Function start");
         let mut collector = WIRECOLLECTOR.lock().unwrap();
         let num_vars = collector.wires.len();
         let new_func = collector
@@ -322,7 +331,7 @@ impl UndefineWireCollector {
     }
 }
 
-#[derive(Debug, Default, Display, Clone)]
+#[derive(Debug, Default, Display, Clone, PartialEq)]
 pub enum PortDir {
     #[strum(to_string = "input")]
     InPort,
@@ -364,6 +373,7 @@ impl From<&String> for PortDir {
         }
     }
 }
+
 
 #[derive(Debug, Clone)]
 pub enum VerilogValue {

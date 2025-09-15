@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use std::cmp::max;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
@@ -8,11 +8,11 @@ use std::sync::{Arc, LazyLock, Mutex};
 use crate::verilog::port::PortDir;
 
 pub struct WireBuilder {
-    wires: HashMap<String, (Arc<VerilogWire>, WirePayload)>,
+    wires: BTreeMap<String, (Arc<VerilogWire>, WirePayload)>,
 }
 static WIRE_BUILDER_INSTANCE: LazyLock<Mutex<WireBuilder>> = LazyLock::new(|| {
     Mutex::new(WireBuilder {
-        wires: HashMap::new(),
+        wires: BTreeMap::new(),
     })
 });
 impl WireBuilder {
@@ -178,7 +178,7 @@ impl WireBuilder {
     ///
     pub fn clear() {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
-        wire_builder.wires = HashMap::new();
+        wire_builder.wires = BTreeMap::new();
     }
 
     ///

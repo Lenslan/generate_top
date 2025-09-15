@@ -34,6 +34,32 @@ impl ExcelWriter {
         let excel_name = parent_path.join(format!("{}.xlsx", module_name));
         log::debug!("start generate excel file {}", excel_name.display());
 
+        let module = self.get_module_from_v(module_name);
+
+        // write excel
+        workbook.push_worksheet(self.add_inst_sheet(&module));
+        for item in module.inst_list.iter() {
+            workbook.push_worksheet(self.add_inst_sheet(&*item.borrow()));
+        }
+        workbook.save(excel_name).unwrap();
+    }
+
+    fn generate_or_update(&self) {
+        todo!()
+    }
+
+    fn update(&self) {
+        let parent_path = self.module_dir_path.parent().expect("Could not get parent path");
+        let module_name = self.module_dir_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .expect("Could not get module name");
+        let excel_name = parent_path.join(format!("{}.xlsx", module_name));
+        let module_v = self.get_module_from_v(module_name);
+        let module_xlsx = self.get_module_from_excel(excel_name);
+    }
+
+    fn get_module_from_v(&self, module_name: &str) -> VerilogModule {
         UndefineWireCollector::clear();
         WireBuilder::clear();
         let mut module = VerilogModule::new(module_name.into());
@@ -46,21 +72,18 @@ impl ExcelWriter {
                 module.add_inst_module(Arc::new(RefCell::new(inst_item)));
             }
         }
-        
+
         // 遍历wire builder 将所有没有驱动/没有load的信号连接到端口
         for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
             module.add_port(inout, &name, width as u32)
         }
 
-        // write excel
-        workbook.push_worksheet(self.add_inst_sheet(&module));
-        for item in module.inst_list.iter() {
-            workbook.push_worksheet(self.add_inst_sheet(&*item.borrow()));
-        }
-        workbook.save(excel_name).unwrap();
+        module
     }
 
-    fn generate_or_update(&self) {}
+    fn get_module_from_excel(&self, path: PathBuf) -> VerilogModule {
+        ExcelReader::new(path).get_excel_info()
+    }
 
     fn traverse_v(&mut self) {
         log::debug!("Traversing verilog files in dir {}", self.module_dir_path.display());

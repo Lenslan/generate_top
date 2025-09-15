@@ -5,7 +5,6 @@ use calamine::{Data, Range, Reader};
 use regex::Regex;
 use crate::verilog::module::VerilogModule;
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
-use crate::verilog::port::VerilogValue::Wire;
 use crate::verilog::wire::WireBuilder;
 
 pub struct ExcelReader {
@@ -53,7 +52,7 @@ impl ExcelReader {
                 if let Some(s) = inst_name {
                     inst_module.fix_inst_name(s);
                 }
-                let _ = inst_module.port_list.iter_mut().map(|p| p.check_health());
+                inst_module.port_list.iter_mut().for_each(|p| p.check_health());
                 module.add_inst_module(Arc::new(RefCell::new(inst_module)));
             }
         }
@@ -178,6 +177,7 @@ impl ExcelReader {
 mod test {
     use crate::excel::reader::ExcelReader;
     use crate::verilog::port::{PortDir, VerilogPort};
+    use crate::verilog::wire::WireBuilder;
 
     // #[test]
     fn test_re() {
@@ -201,6 +201,7 @@ mod test {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let file = ExcelReader::new("src/excel/test/uart.xlsx".into());
         let module = file.get_excel_info();
+        // WireBuilder::builder_show();
         // println!("{:#?}", module);
     }
 }
