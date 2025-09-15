@@ -1,9 +1,12 @@
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::Arc;
-use calamine::{Data, Reader};
-use walkdir::WalkDir;
+use calamine::{Data, Range, Reader};
+use regex::Regex;
 use crate::verilog::module::VerilogModule;
-use crate::verilog::port::{PortDir, VerilogPort};
+use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
+use crate::verilog::port::VerilogValue::Wire;
+use crate::verilog::wire::WireBuilder;
 
 pub struct ExcelReader {
     path: PathBuf,
@@ -17,43 +20,57 @@ impl ExcelReader {
     pub fn generate_v(&self) {}
 
     pub fn get_excel_info(&self) -> VerilogModule {
+        log::debug!("Start extract excel file {}", self.path.display());
         let mut workbook = calamine::open_workbook_auto(&self.path).unwrap();
         let sheets = workbook.sheet_names().to_owned();
         if sheets.len() == 0 {
             log::error!("excel is empty");
             std::process::exit(1);
         }
+
+        UndefineWireCollector::clear();
+        WireBuilder::clear();
+
+        let module_name = &sheets[0];
         let mut module = VerilogModule::new(sheets[0].clone());
-        // todo process module ports
-
-        for inst_name in sheets[1..].iter() {
-            let mut inst_module = VerilogModule::new(String::from(inst_name));
-            let mut port_list = Vec::new();
-            if let Ok(range) = workbook.worksheet_range(inst_name) {
-                for (row_idx, row_data) in  range.rows().enumerate() {
-                    if row_idx == 0 {
-                        let inst_name = match row_data.get(1) {
-                            Some(Data::String(s)) => s.clone(),
-                            _ => String::new(),
-                        };
-                        inst_module.fix_inst_name(&inst_name);
-                    }
-                    if row_idx > 1 {
-                        let port_name = Self::extract_string(row_data.get(0));
-                        if port_name.is_none() { continue }
-                        let inout = Self::extract_inout(row_data.get(1));
-                        let width = Self::extract_width(row_data.get(2));
-                        let wire_name = Self::extract_wires(row_data.get(3));
-                        let port_info = Self::extract_string(row_data.get(4));
-
-                        let new_port = VerilogPort::new(inout, &port_name.unwrap(), width as usize);
-                        // TODO 怎么处理连接的信号呢，有字符串，字符串带range，纯常数
-                    }
-                }
+        // extract module ports
+        if let Ok(range) = workbook.worksheet_range(module_name) {
+            let (port_list, inst_name) = Self::extract_port(&range);
+            module.add_ports(port_list);
+            if let Some(s) = inst_name {
+                module.fix_inst_name(s);
             }
-            inst_module.add_ports(port_list);
-            module.add_inst_module(Arc::new(inst_module));
         }
+        module.port_list.iter().for_each(|p| p.register_port_as_wire());
+
+        // extract inst module
+        for inst_name in sheets[1..].iter() {
+            log::debug!("Extracting sheet {}", inst_name);
+            let mut inst_module = VerilogModule::new(String::from(inst_name));
+            if let Ok(range) = workbook.worksheet_range(inst_name) {
+                let (port_list, inst_name) = Self::extract_port(&range);
+                inst_module.add_ports(port_list);
+                if let Some(s) = inst_name {
+                    inst_module.fix_inst_name(s);
+                }
+                let _ = inst_module.port_list.iter_mut().map(|p| p.check_health());
+                module.add_inst_module(Arc::new(RefCell::new(inst_module)));
+            }
+        }
+        // todo how to process Arc unmuttable
+        // can not check_health();
+        if UndefineWireCollector::has_wires() {
+            UndefineWireCollector::solve_func();
+            module.port_list.iter_mut().for_each(|p| p.check_health());
+            module.inst_list.iter_mut().for_each(|inst| {
+                inst.borrow_mut().port_list.iter_mut().for_each(|p| {
+                    p.check_health();
+                });
+            });
+        }
+        WireBuilder::check_health();
+
+        log::debug!("end extract excel file {}", self.path.display());
 
 
         module
@@ -70,6 +87,7 @@ impl ExcelReader {
         match data {
             Some(Data::Int(n)) => n.clone() as u32,
             Some(Data::String(s)) => s.parse().unwrap(),
+            Some(Data::Float(n)) => n.clone() as u32,
             _ => 0
         }
     }
@@ -92,4 +110,97 @@ impl ExcelReader {
         }
     }
 
+    fn match_wires_by_re(port: &mut VerilogPort, wires: Vec<String>) {
+        let name_re = Regex::new(r"\b[a-zA-Z_]\w*\b").unwrap();
+        let name_range_re = Regex::new(r"(\b[a-zA-Z_]\w*\b)\s*\[\s*(\d+)\s*:\s*(\d+)\s*]").unwrap();
+        let number_re = Regex::new(r"(\d+)'\s*([bodh])\s*([0-9a-fA-F_xzXZ]+)").unwrap();
+
+        for wire in wires {
+            log::debug!("Match wire `{}`:", wire);
+            if let Some(s) = name_range_re.captures(&wire) {
+                let name = s.get(1).unwrap().as_str();
+                let range_end = s.get(2).unwrap().as_str().parse::<usize>().unwrap();
+                let range_start = s.get(3).unwrap().as_str().parse::<usize>().unwrap();
+                port.connect_partial_signal(name, &(range_start..(range_end+1)));
+                log::debug!("=> Match range {}[{}:{}]", name, range_end, range_start);
+            } else if let Some(s) = number_re.captures(&wire) {
+                let width = s.get(1).unwrap().as_str().parse::<u8>().unwrap();
+                let base = match s.get(2).unwrap().as_str() {
+                    "b" => 2,
+                    "o" => 8,
+                    "h" => 16,
+                    _ => 10
+                };
+                let val = u128::from_str_radix(s.get(3).unwrap().as_str(), base).unwrap();
+                port.connect_number_signal(val, width);
+                log::debug!("=> Match number {}'d{}", width, val);
+            } else if let Some(s) = name_re.find(&wire) {
+                let name = s.as_str();
+                port.connect_undefined_signal(name);
+                log::debug!("=> Match name {}",name);
+            }
+        }
+    }
+
+    fn extract_port(range: &Range<Data>) -> (Vec<VerilogPort>, Option<&String>) {
+        let mut port_list = Vec::new();
+        let mut inst_name = None;
+        for (row_idx, row_data) in  range.rows().enumerate() {
+            if row_idx == 0 {
+                if let Some(Data::String(s)) = row_data.get(1) {
+                    inst_name = Some(s);
+                }
+            }
+            if row_idx > 1 {
+                let port_name = Self::extract_string(row_data.get(0));
+                if port_name.is_none() { continue }
+                let inout = Self::extract_inout(row_data.get(1));
+                let width = Self::extract_width(row_data.get(2));
+                let wire_name = Self::extract_wires(row_data.get(3));
+                let port_info = Self::extract_string(row_data.get(4));
+
+                let mut new_port = VerilogPort::new(inout, &port_name.unwrap(), width as usize);
+                if let Some(s) = port_info {
+                    new_port.set_info_msg(&s);
+                }
+                Self::match_wires_by_re(&mut new_port, wire_name);
+
+                port_list.push(new_port);
+            }
+        }
+        (port_list, inst_name)
+    }
+
+}
+
+
+#[cfg(test)]
+mod test {
+    use crate::excel::reader::ExcelReader;
+    use crate::verilog::port::{PortDir, VerilogPort};
+
+    // #[test]
+    fn test_re() {
+        simple_logger::init_with_level(log::Level::Debug).unwrap();
+        let mut  port = VerilogPort::new(PortDir::InPort, "test_port", 32);
+        let test_vec = vec![
+            "testwire1".to_string(),
+            "testwire2[3:0]".to_string(),
+            "testwire3[1:0]".to_string(),
+            "3'b101".to_string(),
+            "10'd34".to_string(),
+            "8'ha9".to_string()
+        ];
+        ExcelReader::match_wires_by_re(&mut port, test_vec);
+        println!("{}", port.to_inst_string(1,1));
+
+    }
+
+    #[test]
+    fn test_excel() {
+        simple_logger::init_with_level(log::Level::Debug).unwrap();
+        let file = ExcelReader::new("src/excel/test/uart.xlsx".into());
+        let module = file.get_excel_info();
+        // println!("{:#?}", module);
+    }
 }

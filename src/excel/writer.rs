@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::excel::reader::ExcelReader;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -42,7 +43,7 @@ impl ExcelWriter {
             for mut inst_item in inst_module {
                 inst_item.set_default_inst_name();
                 inst_item.set_default_port_wires();
-                module.add_inst_module(Arc::new(inst_item));
+                module.add_inst_module(Arc::new(RefCell::new(inst_item)));
             }
         }
         
@@ -54,7 +55,7 @@ impl ExcelWriter {
         // write excel
         workbook.push_worksheet(self.add_inst_sheet(&module));
         for item in module.inst_list.iter() {
-            workbook.push_worksheet(self.add_inst_sheet(item));
+            workbook.push_worksheet(self.add_inst_sheet(&*item.borrow()));
         }
         workbook.save(excel_name).unwrap();
     }
@@ -103,7 +104,6 @@ impl ExcelWriter {
         }
     }
 
-    // TODO how to write inst name
     fn add_inst_sheet(&self, module: &VerilogModule) -> Worksheet {
         let mut sheet = Worksheet::new();
         let header_format = Format::new()
@@ -113,6 +113,9 @@ impl ExcelWriter {
             .set_border_bottom(FormatBorder::Medium)
             .set_border_top(FormatBorder::Medium)
             .set_background_color(Color::Gray);
+        let inst_name_format = Format::new()
+            .set_bold()
+            .set_align(FormatAlign::Center);
         let number_format = Format::new()
             .set_align(FormatAlign::Left);
         let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-info"];
@@ -122,7 +125,7 @@ impl ExcelWriter {
         sheet.set_row_height(0, 18).unwrap();
         sheet.set_row_height(1, 20).unwrap();
 
-        sheet.write(0, 0, "Module Inst Name").unwrap();
+        sheet.write_with_format(0, 0, "Module Inst Name", &inst_name_format).unwrap();
         sheet.write(0, 1, format!("{}", module.inst_name.as_deref().unwrap_or_default())).unwrap();
 
         for item in title_list.into_iter().enumerate() {

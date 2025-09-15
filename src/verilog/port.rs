@@ -41,6 +41,9 @@ impl VerilogPort {
     }
 
     pub fn register_port_as_wire(&self) {
+        if self.signals.len() > 1 {
+            return;
+        }
         match self.inout {
             PortDir::InPort => WireBuilder::add_driver_wire_asport(&self.name, &(0..self.width)),
             PortDir::OutPort => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width)),
@@ -277,7 +280,7 @@ impl UndefineWireCollector {
     ///
     /// call this function after all the port are connected
     ///
-    fn solve_func() {
+    pub fn solve_func() {
         let mut collector = WIRECOLLECTOR.lock().unwrap();
         let num_vars = collector.wires.len();
         let new_func = collector
@@ -305,7 +308,7 @@ impl UndefineWireCollector {
         }
     }
 
-    fn has_wires() -> bool {
+    pub fn has_wires() -> bool {
         let collector = WIRECOLLECTOR.lock().unwrap();
         collector.wires.len() > 0
     }

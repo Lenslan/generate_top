@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::verilog::port::{PortDir, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
@@ -10,7 +11,7 @@ pub struct VerilogModule {
     pub module_name: String,
     pub inst_name: Option<String>,
     pub port_list: Vec<VerilogPort>,
-    pub inst_list: Vec<Arc<VerilogModule>>,
+    pub inst_list: Vec<Arc<RefCell<VerilogModule>>>,
 }
 impl VerilogModule {
     pub fn new(module_name: String) -> Self {
@@ -32,7 +33,7 @@ impl VerilogModule {
         self.port_list.extend(ports);
     }
 
-    pub fn add_inst_module(&mut self, module: Arc<VerilogModule>) {
+    pub fn add_inst_module(&mut self, module: Arc<RefCell<VerilogModule>>) {
         self.inst_list.push(module);
     }
 
@@ -93,7 +94,7 @@ impl VerilogModule {
 
         // port info
         if let Some((last_port, ports)) = self.port_list.split_last() {
-            for port in self.port_list.iter() {
+            for port in ports.iter() {
                 res.push(format!(
                     "{indent_space}{inout} wire [{width}:0] {name},",
                     indent_space = " ".repeat(indent),
@@ -127,7 +128,7 @@ impl VerilogModule {
 
         // inst info
         for inst in self.inst_list.iter() {
-            res.extend(inst.to_inst_string());
+            res.extend(inst.borrow().to_inst_string());
             res.push("\n\n".into());
         }
         res.push("endmodule".into());
