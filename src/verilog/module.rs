@@ -68,6 +68,17 @@ impl VerilogModule {
     }
 
     ///
+    /// Compared with other VerilogModules
+    /// to find ports in self & other
+    ///
+    pub fn same_ports_with(&self, other: &VerilogModule) -> Vec<&VerilogPort> {
+        let other_ports: HashSet<_> = other.port_list.iter().collect();
+        self.port_list.iter().filter(|item| {
+            !other_ports.contains(item)
+        }).collect()
+    }
+
+    ///
     /// output instance String
     ///
     fn to_inst_string(&self) -> Vec<String> {
