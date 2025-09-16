@@ -7,6 +7,7 @@ use std::fmt::format;
 use std::ops::Range;
 use std::sync::{LazyLock, Mutex};
 use std::{fmt, sync::Arc, vec};
+use std::hash::{Hash, Hasher};
 use strum::Display;
 use crate::verilog::VerilogBase;
 
@@ -251,6 +252,15 @@ impl PartialEq for VerilogPort {
             && (self.name == other.name)
     }
 }
+impl Eq for VerilogPort {}
+
+impl Hash for VerilogPort {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.width.hash(state);
+        self.inout.hash(state);
+    }
+}
 #[derive(Default)]
 pub struct UndefineWireCollector {
     wires: HashMap<String, usize>,
@@ -331,7 +341,7 @@ impl UndefineWireCollector {
     }
 }
 
-#[derive(Debug, Default, Display, Clone, PartialEq)]
+#[derive(Debug, Default, Display, Clone, PartialEq, Hash, Eq)]
 pub enum PortDir {
     #[strum(to_string = "input")]
     InPort,

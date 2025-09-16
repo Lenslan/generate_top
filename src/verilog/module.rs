@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use crate::verilog::port::{PortDir, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
@@ -53,6 +54,17 @@ impl VerilogModule {
             p.connect_self();
             p.check_health();
         }
+    }
+
+    ///
+    /// Compared with other VerilogModules
+    /// to find ports in self not in other
+    ///
+    pub fn diff_ports_with(&self, other: &VerilogModule) -> Vec<&VerilogPort> {
+        let other_ports: HashSet<_> = other.port_list.iter().collect();
+        self.port_list.iter().filter(|item| {
+            !other_ports.contains(item)
+        }).collect()
     }
 
     ///
