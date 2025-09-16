@@ -148,7 +148,7 @@ impl WireBuilder {
     /// must call this function after connected all the port
     ///
     pub fn check_health() {
-        log::info!("WireBuilder health check start >>>>");
+        log::info!(">>> WireBuilder health check start >>>>");
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         for (wire, payload) in wire_builder.wires.values() {
             // Self::check_driver_load(&payload.driver, &payload.load, &wire.name);
@@ -161,7 +161,7 @@ impl WireBuilder {
                 log::warn!("wire {}[{}] has driver but no load", wire.name, bit);
             }
         }
-        log::info!("WireBuilder health check end  <<<<");
+        log::info!("<<< WireBuilder health check end  <<<<");
     }
 
     ///
