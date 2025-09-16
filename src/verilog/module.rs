@@ -172,7 +172,7 @@ impl VerilogModule {
                 ));
             }
             res.push(format!(
-                "    .{}\n); // {}",
+                "    .{} // {}\n);",
                 last_port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN),
                 last_port.info
             ));
@@ -182,10 +182,10 @@ impl VerilogModule {
         res
     }
 
-    fn to_module_string(&self) -> Vec<String> {
+    pub fn to_module_string(&self) -> Vec<String> {
         let mut res = Vec::new();
         let mut indent = 0;
-        res.push(format!("{} (", self.module_name));
+        res.push(format!("module {} (", self.module_name));
 
         indent += 4;
 

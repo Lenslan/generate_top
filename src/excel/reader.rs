@@ -1,4 +1,7 @@
 use std::cell::RefCell;
+use std::fmt::format;
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use calamine::{Data, Range, Reader};
@@ -12,11 +15,26 @@ pub struct ExcelReader {
 }
 
 impl ExcelReader {
+
+    ///
+    /// 指定excel的路径
+    ///
     pub fn new(path: PathBuf) -> Self {
         ExcelReader { path }
     }
 
-    pub fn generate_v(&self) {}
+    pub fn generate_v(&self) {
+        let module = self.get_excel_info();
+        let parent_path = self.path.parent().expect("Could not get parent path");
+        let module_name = self.path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .expect("Could not get module name");
+        let top_path = parent_path.join(format!("{}.v", module_name));
+        let mut file = File::create(top_path).unwrap();
+        file.write_all(&module.to_module_string().join("\n").as_bytes()).unwrap();
+
+    }
 
     pub fn get_excel_info(&self) -> VerilogModule {
         log::debug!("Start extract excel file {}", self.path.display());
@@ -192,7 +210,7 @@ mod test {
     fn test_excel() {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let file = ExcelReader::new("src/excel/test/uart.xlsx".into());
-        let module = file.get_excel_info();
+        file.generate_v();
         // WireBuilder::builder_show();
         // println!("{:#?}", module);
     }
