@@ -41,8 +41,9 @@ impl VerilogPort {
         self.info = format!("{}", msg)
     }
 
-    pub fn register_port_as_wire(&self) {
+    pub fn register_port_as_wire(&mut self) {
         if self.signals.len() > 1 {
+            self.check_health();
             return;
         }
         match self.inout {
@@ -50,6 +51,7 @@ impl VerilogPort {
             PortDir::OutPort => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width)),
             _ => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width)), //TODO how to process inout port
         };
+        self.health_checked = true;
     }
 
     ///

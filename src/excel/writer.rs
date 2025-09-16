@@ -101,33 +101,37 @@ impl ExcelWriter {
             module.add_inst_module(Arc::new(RefCell::new(new_module)));
         }
 
-        // // add port
-        // for p in module_v.same_ports_with(&module_xlsx) {
-        //     log::debug!("add port in rtl & xlsx: {}", p.name);
-        //     let new_port = VerilogPort::copy_port_from(p);
-        //     new_port.register_port_as_wire();
-        //     module.add_port_inst(new_port);
-        // }
-        // for p in module_v.diff_ports_with(&module_xlsx) {
-        //     log::debug!("add port in rtl but not in xlsx: {}", p.name);
-        //     let new_port = VerilogPort::copy_port_from(p);
-        //     new_port.register_port_as_wire();
-        //     module.add_port_inst(new_port);
-        // }
-        // for p in module_xlsx.diff_ports_with(&module_v) {
-        //     if WireBuilder::find_wire_in(p) {
-        //         log::debug!("add wire in xlsx but not in rtl: {}", p.name);
-        //         let new_port = VerilogPort::copy_port_from(p);
-        //         new_port.register_port_as_wire();
-        //         module.add_port_inst(new_port);
-        //     }
-        // }
-        //
-        // // final check
-        // module.final_check();
+        let mut temp_module = VerilogModule::new("temp".into());
         for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
-            module.add_port(inout, &name, width as u32)
+            temp_module.add_port(inout, &name, width as u32)
         }
+
+        // add port
+        for p in module_xlsx.same_ports_with(&temp_module) {
+            log::debug!("add port in rtl & xlsx: {}", p.name);
+            let mut new_port = VerilogPort::copy_port_from(p);
+            new_port.register_port_as_wire();
+            module.add_port_inst(new_port);
+        }
+        for p in temp_module.diff_ports_with(&module_xlsx) {
+            log::debug!("add port in rtl but not in xlsx: {}", p.name);
+            let mut new_port = VerilogPort::copy_port_from(p);
+            new_port.register_port_as_wire();
+            module.add_port_inst(new_port);
+        }
+        for p in module_xlsx.diff_ports_with(&temp_module) {
+            if WireBuilder::find_wire_in(p) {
+                log::debug!("add wire in xlsx but not in rtl: {}", p.name);
+                let mut new_port = VerilogPort::copy_port_from(p);
+                new_port.register_port_as_wire();
+                module.add_port_inst(new_port);
+            } else {
+                log::debug!("Port {} in xlsx but not in rtl was dropped", p.name);
+            }
+        }
+
+
+
 
         self.write_excel(excel_name, module);
 
@@ -267,6 +271,7 @@ mod test {
     fn test_generate() {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let mut  writer = ExcelWriter::new(PathBuf::from("./src/excel/test/uart"));
+        println!("start running");
         writer.traverse_v();
         writer.generate_or_update();
     }

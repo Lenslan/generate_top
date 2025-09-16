@@ -5,7 +5,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::sync::{Arc, LazyLock, Mutex};
-use crate::verilog::port::{PortDir, VerilogPort};
+use crate::verilog::port::{PortDir, VerilogPort, VerilogValue};
 
 pub struct WireBuilder {
     wires: BTreeMap<String, (Arc<VerilogWire>, WirePayload)>,
@@ -169,22 +169,38 @@ impl WireBuilder {
     ///
     pub fn find_wire_in(port: &VerilogPort) -> bool {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
-        if let Some((_, payload)) = wire_builder.wires.get(&port.name) {
-            let width = WireBuilder::get_width(&port.name);
-            if width == port.width {
-                match port.inout {
-                    PortDir::InPort => {
-                        if payload.load.len() > 0 {return true}
+        let mut res = vec![false];
+        let judge = |name: &str| {
+            if let Some((_, payload)) = wire_builder.wires.get(name) {
+                let width = max(
+                    payload.driver.iter().max().unwrap_or(&0),
+                    payload.load.iter().max().unwrap_or(&0)
+                );
+
+                if *width == port.width {
+                    match port.inout {
+                        PortDir::InPort => {
+                            if payload.load.len() > 0 { return true }
+                        }
+                        PortDir::OutPort => {
+                            if payload.driver.len() > 0 { return true }
+                        }
+                        PortDir::InOutPort => {}
+                        PortDir::Unknown => {}
                     }
-                    PortDir::OutPort => {
-                        if payload.driver.len() > 0 {return true}
-                    }
-                    PortDir::InOutPort => {}
-                    PortDir::Unknown => {}
                 }
             }
+            false
+        };
+        for wire in port.signals.iter() {
+            res.push(match wire {
+                VerilogValue::Wire(w, range) => judge(&w.name),
+                VerilogValue::UndefinedWire(s) => judge(s),
+                VerilogValue::Number { .. } => true,
+                VerilogValue::NONE => judge(&port.name)
+            });
         }
-        false
+        res.iter().any(|&x| x)
     }
 
     ///

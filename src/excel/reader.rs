@@ -40,7 +40,7 @@ impl ExcelReader {
                 module.fix_inst_name(s);
             }
         }
-        module.port_list.iter().for_each(|p| p.register_port_as_wire());
+        module.port_list.iter_mut().for_each(|p| p.register_port_as_wire());
 
         // extract inst module
         for inst_name in sheets[1..].iter() {
@@ -154,6 +154,7 @@ impl ExcelReader {
                     new_port.set_info_msg(&s);
                 }
                 Self::match_wires_by_re(&mut new_port, wire_name);
+                new_port.check_health();
 
                 port_list.push(new_port);
             }
