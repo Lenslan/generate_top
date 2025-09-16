@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use crate::verilog::port::{PortDir, VerilogPort};
+use std::ops::Deref;
+use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
 use crate::verilog::VerilogBase;
@@ -83,6 +84,35 @@ impl VerilogModule {
             p.check_health();
         }
     }
+    
+    ///
+    /// generate a module from other VerilogModule
+    /// used to copy submodule
+    /// 
+    pub fn copy_module_from(other: &VerilogModule) -> VerilogModule{
+        let mut new_module = VerilogModule::new(other.module_name.clone());
+        for p in other.port_list.iter() {
+            let new_port = VerilogPort::copy_port_from(p);
+            new_module.add_port_inst(new_port);
+        }
+        new_module
+    }
+
+    ///
+    /// Compare with other VerilogModules
+    /// to find inst module in self not in other
+    ///
+    pub fn diff_inst_with(&self, other:&VerilogModule) -> Vec<Arc<RefCell<VerilogModule>>> {
+        let ids: HashSet<_> = other.inst_list
+            .iter()
+            .map(|x| x.borrow().module_name.clone())
+            .collect();
+        self.inst_list
+            .iter()
+            .filter(|x| !ids.contains(&x.borrow().module_name))
+            .cloned()
+            .collect()
+    }
 
     ///
     /// Compared with other VerilogModules
@@ -104,6 +134,22 @@ impl VerilogModule {
         self.port_list.iter().filter(|item| {
             !other_ports.contains(item)
         }).collect()
+    }
+    
+    ///
+    /// final check
+    /// 
+    pub fn final_check(&mut self) {
+        if UndefineWireCollector::has_wires() {
+            UndefineWireCollector::solve_func();
+            self.port_list.iter_mut().for_each(|p| p.check_health());
+            self.inst_list.iter_mut().for_each(|inst| {
+                inst.borrow_mut().port_list.iter_mut().for_each(|p| {
+                    p.check_health();
+                });
+            });
+        }
+        WireBuilder::check_health();
     }
 
     ///

@@ -6,7 +6,7 @@ use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, RowNum, 
 use walkdir::WalkDir;
 use crate::verilog::module::VerilogModule;
 use crate::verilog::parse::VerilogParser;
-use crate::verilog::port::UndefineWireCollector;
+use crate::verilog::port::{UndefineWireCollector, VerilogPort, VerilogValue};
 use crate::verilog::wire::WireBuilder;
 
 #[derive(Default)]
@@ -30,22 +30,30 @@ impl ExcelWriter {
             .and_then(|s| s.to_str())
             .expect("Could not get module name");
 
-        let mut workbook = Workbook::new();
         let excel_name = parent_path.join(format!("{}.xlsx", module_name));
         log::debug!("start generate excel file {}", excel_name.display());
 
         let module = self.get_module_from_v(module_name);
 
         // write excel
-        workbook.push_worksheet(self.add_inst_sheet(&module));
-        for item in module.inst_list.iter() {
-            workbook.push_worksheet(self.add_inst_sheet(&*item.borrow()));
-        }
-        workbook.save(excel_name).unwrap();
+        self.write_excel(excel_name, module);
     }
 
     fn generate_or_update(&self) {
-        todo!()
+        let parent_path = self.module_dir_path.parent().expect("Could not get parent path");
+        let module_name = self.module_dir_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .expect("Could not get module name");
+        let excel_name = parent_path.join(format!("{}.xlsx", module_name));
+
+        if excel_name.exists() {
+            log::debug!("excel {} already exists", excel_name.display());
+            self.update();
+        } else {
+            log::debug!("excel {} does not exist", excel_name.display());
+            self.generate();
+        }
     }
 
     fn update(&self) {
@@ -56,7 +64,69 @@ impl ExcelWriter {
             .expect("Could not get module name");
         let excel_name = parent_path.join(format!("{}.xlsx", module_name));
         let module_v = self.get_module_from_v(module_name);
-        let module_xlsx = self.get_module_from_excel(excel_name);
+        let module_xlsx = self.get_module_from_excel(&excel_name);
+
+        UndefineWireCollector::clear();
+        WireBuilder::clear();
+        let mut module = VerilogModule::new(module_name.into());
+        // add inst
+        for inst_excel in module_xlsx.inst_list.iter() {
+            let inst_excel = inst_excel.borrow();
+            if let Some(inst_v) = module_v.find_inst_module_by_name(&inst_excel.module_name) {
+                let inst_v = inst_v.borrow();
+                let mut inst_module = VerilogModule::new(inst_excel.module_name.clone());
+                inst_module.fix_inst_name(inst_excel.inst_name.as_deref().unwrap());
+
+                // traverse all the port of `inst_v`
+                for p in inst_excel.same_ports_with(&inst_v) {
+                    let new_port = VerilogPort::copy_port_from(p);
+                    inst_module.add_port_inst(new_port);
+                }
+                for p in inst_v.diff_ports_with(&inst_excel) {
+                    let new_port = VerilogPort::copy_port_from(p);
+                    inst_module.add_port_inst(new_port);
+                }
+                module.add_inst_module(Arc::new(RefCell::new(inst_module)));
+            } else { continue; }
+        }
+
+        for inst in module_v.diff_inst_with(&module_xlsx) {
+            let inst = inst.borrow();
+            let new_module = VerilogModule::copy_module_from(&inst);
+            module.add_inst_module(Arc::new(RefCell::new(new_module)));
+        }
+
+        // add port
+        for p in module_v.same_ports_with(&module_xlsx) {
+            let new_port = VerilogPort::copy_port_from(p);
+            module.add_port_inst(new_port);
+        }
+        for p in module_v.diff_ports_with(&module_xlsx) {
+            let new_port = VerilogPort::copy_port_from(p);
+            module.add_port_inst(new_port);
+        }
+        for p in module_xlsx.diff_ports_with(&module_v) {
+            if WireBuilder::find_wire_in(p) {
+                let new_port = VerilogPort::copy_port_from(p);
+                module.add_port_inst(new_port);
+            }
+        }
+
+        // final check
+        module.final_check();
+
+        self.write_excel(excel_name, module);
+
+    }
+
+    fn write_excel(&self, excel_name: PathBuf, module: VerilogModule) {
+        let mut workbook = Workbook::new();
+
+        workbook.push_worksheet(self.add_inst_sheet(&module));
+        for item in module.inst_list.iter() {
+            workbook.push_worksheet(self.add_inst_sheet(&*item.borrow()));
+        }
+        workbook.save(excel_name).unwrap();
     }
 
     fn get_module_from_v(&self, module_name: &str) -> VerilogModule {
@@ -81,8 +151,8 @@ impl ExcelWriter {
         module
     }
 
-    fn get_module_from_excel(&self, path: PathBuf) -> VerilogModule {
-        ExcelReader::new(path).get_excel_info()
+    fn get_module_from_excel(&self, path: &PathBuf) -> VerilogModule {
+        ExcelReader::new(path.clone()).get_excel_info()
     }
 
     fn traverse_v(&mut self) {
@@ -184,6 +254,6 @@ mod test {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let mut  writer = ExcelWriter::new(PathBuf::from("./src/excel/test/uart"));
         writer.traverse_v();
-        writer.generate();
+        writer.generate_or_update();
     }
 }

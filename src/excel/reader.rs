@@ -56,18 +56,9 @@ impl ExcelReader {
                 module.add_inst_module(Arc::new(RefCell::new(inst_module)));
             }
         }
-        // todo how to process Arc unmuttable
-        // can not check_health();
-        if UndefineWireCollector::has_wires() {
-            UndefineWireCollector::solve_func();
-            module.port_list.iter_mut().for_each(|p| p.check_health());
-            module.inst_list.iter_mut().for_each(|inst| {
-                inst.borrow_mut().port_list.iter_mut().for_each(|p| {
-                    p.check_health();
-                });
-            });
-        }
-        WireBuilder::check_health();
+        
+        // final check
+        module.final_check();
 
         log::debug!("end extract excel file {}", self.path.display());
 

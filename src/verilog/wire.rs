@@ -5,7 +5,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::sync::{Arc, LazyLock, Mutex};
-use crate::verilog::port::PortDir;
+use crate::verilog::port::{PortDir, VerilogPort};
 
 pub struct WireBuilder {
     wires: BTreeMap<String, (Arc<VerilogWire>, WirePayload)>,
@@ -162,6 +162,29 @@ impl WireBuilder {
             }
         }
         log::info!("WireBuilder health check end  <<<<");
+    }
+
+    ///
+    /// find wire in WireBuilder
+    ///
+    pub fn find_wire_in(port: &VerilogPort) -> bool {
+        let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
+        if let Some((_, payload)) = wire_builder.wires.get(&port.name) {
+            let width = WireBuilder::get_width(&port.name);
+            if width == port.width {
+                match port.inout {
+                    PortDir::InPort => {
+                        if payload.load.len() > 0 {return true}
+                    }
+                    PortDir::OutPort => {
+                        if payload.driver.len() > 0 {return true}
+                    }
+                    PortDir::InOutPort => {}
+                    PortDir::Unknown => {}
+                }
+            }
+        }
+        false
     }
 
     ///
