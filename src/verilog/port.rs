@@ -38,7 +38,7 @@ impl VerilogPort {
     }
 
     pub fn set_info_msg(&mut self, msg: &str) {
-        self.info = format!("// {}", msg)
+        self.info = format!("{}", msg)
     }
 
     pub fn register_port_as_wire(&self) {
@@ -207,6 +207,30 @@ impl VerilogPort {
         };
     }
 
+    pub fn copy_port_from(p: &VerilogPort) -> Self {
+        let mut new_port = VerilogPort::new(p.inout, &p.name, p.width);
+        if p.info.len() > 0 {
+            new_port.set_info_msg(&p.info)
+        }
+        for sig in p.signals.iter() {
+            match sig {
+                VerilogValue::Wire(w, range) => {
+                    new_port.connect_partial_signal(&w.name, range);
+                }
+                VerilogValue::UndefinedWire(s) => {
+                    new_port.connect_undefined_signal(s);
+                }
+                VerilogValue::Number { width, value } => {
+                    new_port.connect_number_signal(*value, *width);
+                }
+                VerilogValue::NONE => {}
+            }
+        }
+        new_port.check_health();
+        new_port
+    }
+
+
     pub fn get_signal_string(&self) -> String {
         let signal_string = match self.signals.len() {
             0 | 1 => "".into(),
@@ -341,7 +365,7 @@ impl UndefineWireCollector {
     }
 }
 
-#[derive(Debug, Default, Display, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Default, Display, Clone, PartialEq, Hash, Eq, Copy)]
 pub enum PortDir {
     #[strum(to_string = "input")]
     InPort,
