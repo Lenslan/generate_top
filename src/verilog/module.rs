@@ -30,6 +30,10 @@ impl VerilogModule {
             .push(VerilogPort::new(inout, name, width as usize))
     }
 
+    pub fn add_port_inst(&mut self, port: VerilogPort) {
+        self.port_list.push(port);
+    }
+
     pub fn add_ports(&mut self, ports: Vec<VerilogPort>) {
         self.port_list.extend(ports);
     }
@@ -37,7 +41,31 @@ impl VerilogModule {
     pub fn add_inst_module(&mut self, module: Arc<RefCell<VerilogModule>>) {
         self.inst_list.push(module);
     }
+    
+    ///
+    /// According module name to find inst module
+    /// 
+    pub fn find_inst_module_by_name(&self, name: &str) -> Option<Arc<RefCell<VerilogModule>>> {
+        for item in self.inst_list.iter() {
+            if item.borrow().module_name == name {
+                return Some(Arc::clone(item));
+            }
+        }
+        None
+    }
 
+    // TODO replace by `same_ports_with`
+    // ///
+    // /// According port name to find port
+    // ///
+    // pub fn find_same_port(&self, port: &VerilogPort) -> Option<&VerilogPort> {
+    //     for item in self.port_list.iter() {
+    //         if port == item {
+    //             return Some(item);
+    //         }
+    //     }
+    //     None
+    // }
     ///
     /// Fix instance name
     ///
@@ -92,13 +120,13 @@ impl VerilogModule {
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports {
                 res.push(format!(
-                    "    .{}, {}",
+                    "    .{}, // {}",
                     port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN),
                     port.info
                 ));
             }
             res.push(format!(
-                "    .{}\n); {}",
+                "    .{}\n); // {}",
                 last_port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN),
                 last_port.info
             ));
