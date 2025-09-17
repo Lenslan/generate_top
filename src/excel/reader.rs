@@ -27,7 +27,7 @@ impl ExcelReader {
         let module = self.get_excel_info();
         let parent_path = self.path.parent().expect("Could not get parent path");
         let module_name = self.path
-            .file_name()
+            .file_stem()
             .and_then(|s| s.to_str())
             .expect("Could not get module name");
         let top_path = parent_path.join(format!("{}.v", module_name));

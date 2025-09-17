@@ -165,17 +165,28 @@ impl VerilogModule {
 
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports {
+                let info = if port.info.len() > 0 {
+                    format!(" // {}", port.info)
+                } else {
+                    "".to_string()
+                };
                 res.push(format!(
-                    "    .{}, // {}",
+                    "    .{},{}",
                     port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN),
-                    port.info
+                    info
                 ));
             }
+            let info = if last_port.info.len() > 0 {
+                format!("  // {}", last_port.info)
+            }else {
+                "".to_string()
+            };
             res.push(format!(
-                "    .{} // {}\n);",
+                "    .{}{}",
                 last_port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN),
-                last_port.info
+                info
             ));
+            res.push(");".to_string());
         } else {
             log::error!("There is no port in module {}", self.module_name);
         }
@@ -192,21 +203,40 @@ impl VerilogModule {
         // port info
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports.iter() {
+                let info = if port.info.len() > 0 {
+                    format!(" // {}", port.info)
+                }else { "".into() };
+                let width = if port.width < 2 {
+                    " ".repeat(8)
+                }else {
+                    format!("[{:<4}:0]", port.width-1)
+                };
                 res.push(format!(
-                    "{indent_space}{inout} wire [{width}:0] {name},",
-                    indent_space = " ".repeat(indent),
-                    inout = port.inout,
-                    width = port.width,
-                    name = port.name
+                    "{}{:<10} wire {} {:<20},{}",
+                    " ".repeat(indent),
+                    port.inout,
+                    width,
+                    port.name,
+                    info
                 ))
             }
+            let info = if last_port.info.len() > 0 {
+                format!("  // {}", last_port.info)
+            }else { "".into() };
+            let width = if last_port.width < 2 {
+                " ".repeat(8)
+            }else {
+                format!("[{:<4}:0]", last_port.width-1)
+            };
             res.push(format!(
-                "{indent_space}{inout} wire [{width}:0] {name});",
-                indent_space = " ".repeat(indent),
-                inout = last_port.inout,
-                width = last_port.width,
-                name = last_port.name
-            ))
+                "{}{:<10} wire {} {:<20}{}",
+                " ".repeat(indent),
+                last_port.inout,
+                width,
+                last_port.name,
+                info
+            ));
+            res.push(");\n\n".to_string());
         }
 
         // wire definition
@@ -215,17 +245,26 @@ impl VerilogModule {
             .map(|(width, name)| {
                 format!(
                     "{}wire {:<20} {}",
-                    " ".repeat(indent),
+                    " ".repeat(4),
                     format!("[{}:0]", width - 1),
                     name
                 )
             })
             .collect::<Vec<String>>();
-        res.extend(s);
+        res.extend(s.into_iter().map(|s| format!("{}{}", " ".repeat(indent), s)).collect::<Vec<String>>());
+
+        // port wire connected
+
 
         // inst info
         for inst in self.inst_list.iter() {
-            res.extend(inst.borrow().to_inst_string());
+            res.extend(inst
+                .borrow()
+                .to_inst_string()
+                .into_iter()
+                .map(|s| format!("{}{}", " ".repeat(indent), s))
+                .collect::<Vec<String>>()
+            );
             res.push("\n\n".into());
         }
         res.push("endmodule".into());
