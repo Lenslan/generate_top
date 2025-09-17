@@ -27,7 +27,7 @@ impl WireBuilder {
             .or_insert_with(|| (Arc::new(VerilogWire::new(name.into())), Default::default()));
         for i in range.clone().into_iter() {
             if !payload.driver.insert(i) {
-                log::error!("wire {} has multi driver", name)
+                log::error!("wire {} bit[{}] has multi driver", name, i)
             }
         }
         Arc::clone(arc_wire)

@@ -124,7 +124,7 @@ impl VerilogPort {
         let width_sum = self.get_connected_width();
         let wire_infer_width = self.width - width_sum;
         if wire_infer_width <= 0 {
-            log::warn!("Port {} has been over connected", self.name);
+            log::warn!("[Infer Undefine-wire] Port {} has been over connected, port width is {}, but signal used already fill {} bits", self.name, self.width, width_sum);
             return;
         }
         let (idx, signal) = self
@@ -143,8 +143,8 @@ impl VerilogPort {
     fn check_connected(&mut self) {
         let width_sum = self.get_connected_width();
         match self.width.cmp(&width_sum) {
-            Ordering::Greater => log::warn!("Port {} has not been full connected", self.name),
-            Ordering::Less => log::warn!("Port {} has been over connected", self.name),
+            Ordering::Greater => log::warn!("Port {} has not been full connected, port width is {} but signal width is {}", self.name,self.width,width_sum),
+            Ordering::Less => log::warn!("Port {} has been over connected, port width is {} but signal width is {}", self.name, self.width,width_sum),
             _ => {}
         }
         self.health_checked = true;
@@ -167,7 +167,7 @@ impl VerilogPort {
         let width = self.get_connected_width();
         let infer_width = self.width - width;
         if infer_width <= 0 {
-            log::warn!("Port {} has not been full connected", self.name);
+            log::warn!("[Process Undefine-wire] Port {} has been over connected, port width is {}, bug signal used already fill {} bits", self.name, self.width, width);
         }
         UndefineWireCollector::add_func(func_group, infer_width as i64);
         self.undefine_registered = true;
@@ -227,7 +227,8 @@ impl VerilogPort {
                 VerilogValue::NONE => {}
             }
         }
-        new_port.check_health();
+        // dont check_health, since do this by function caller
+        // new_port.check_health();
         new_port
     }
 

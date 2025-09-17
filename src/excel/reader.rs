@@ -23,7 +23,8 @@ impl ExcelReader {
     }
 
     pub fn generate_v(&self) {
-        let module = self.get_excel_info();
+        let mut module = self.get_excel_info();
+        module.final_check();
         let parent_path = self.path.parent().expect("Could not get parent path");
         let module_name = self.path
             .file_stem()
@@ -75,7 +76,8 @@ impl ExcelReader {
         }
         
         // final check
-        module.final_check();
+        // dont exec this function, do it by function caller
+        // module.final_check();
 
         log::debug!("end extract excel file {}", self.path.display());
 

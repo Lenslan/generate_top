@@ -92,7 +92,8 @@ impl VerilogModule {
     pub fn copy_module_from(other: &VerilogModule) -> VerilogModule{
         let mut new_module = VerilogModule::new(other.module_name.clone());
         for p in other.port_list.iter() {
-            let new_port = VerilogPort::copy_port_from(p);
+            let mut new_port = VerilogPort::copy_port_from(p);
+            new_port.check_health();
             new_module.add_port_inst(new_port);
         }
         new_module

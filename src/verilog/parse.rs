@@ -66,9 +66,10 @@ impl<'a> VerilogParser<'a> {
 
     pub fn extract_module(&mut self) {
         if self.parse_res.is_none() {
-            log::error!("cannot extract module");
+            log::error!("Cannot extract module");
+            std::process::exit(1);
         }
-        log::info!("start extract module");
+        log::debug!("start extract module");
 
         let tree = self.parse_res.as_ref().unwrap();
 
@@ -115,11 +116,11 @@ impl<'a> VerilogParser<'a> {
                 _ => {}
             }
         }
-        log::info!("end extract module");
+        log::debug!("end extract module");
     }
 
     fn extract_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
-        log::info!("start extract ports");
+        log::debug!("start non-ansi extract ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter() {
             if let RefNode::PortDeclaration(port_dir) = item {
@@ -149,12 +150,12 @@ impl<'a> VerilogParser<'a> {
                 }
             }
         }
-        log::info!("end extract ports");
+        log::debug!("end  non-ansi extract ports");
         port_list
     }
 
     fn extract_ansi_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
-        log::info!("start extract ansi ports");
+        log::debug!("start extract ansi ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter() {
             if let RefNode::AnsiPortDeclaration(port_dir) = item {
@@ -180,6 +181,7 @@ impl<'a> VerilogParser<'a> {
                     log::error!("Can not extract ansi port name");
                     "".into()
                 };
+                log::debug!("extract port name is {}", port_name);
 
                 let port_inst = VerilogPort::new(inout, &port_name, width);
                 port_list.push(port_inst);
@@ -189,14 +191,14 @@ impl<'a> VerilogParser<'a> {
     }
 
     fn get_port_width(&self, port_node: RefNode) -> Option<usize> {
-        log::info!("extract port width");
+        log::debug!("extract port width >>>");
         if let Some(range) = unwrap_node!(port_node, PackedDimension) {
-            log::info!("find node {:?}", range);
+            log::debug!("find node {:?}", range);
             if let Some(RefNode::ConstantRange(range)) = unwrap_node!(range, ConstantRange) {
                 let upper = self.extract_expr(&range.nodes.0).calculate();
                 let lower = self.extract_expr(&range.nodes.2).calculate();
 
-                log::info!("port range upper: {:?} and lower: {:?}", upper, lower);
+                log::debug!("port range upper: {:?} and lower: {:?}", upper, lower);
                 if upper.is_ok() && lower.is_ok() {
                     Some(upper.unwrap() - lower.unwrap() + 1)
                 } else {
@@ -209,7 +211,7 @@ impl<'a> VerilogParser<'a> {
                     None
                 }
             } else {
-                log::info!("cannot find node ConstantRange");
+                log::debug!("cannot find node ConstantRange");
                 None
             }
         } else {
@@ -228,7 +230,7 @@ impl<'a> VerilogParser<'a> {
             Some(RefNode::ConstantPrimary(t)) => self
                 .get_literal_string(RefNode::from(t))
                 .unwrap_or_else(|| {
-                    log::info!("Cannot extract ConstantPrimary");
+                    log::debug!("Cannot extract ConstantPrimary");
                     "".into()
                 }),
             Some(RefNode::ConstantExpressionBinary(t)) => {
@@ -243,15 +245,15 @@ impl<'a> VerilogParser<'a> {
                 format!("{}{}{}", left, op, right)
             }
             Some(RefNode::ConstantExpressionUnary(t)) => {
-                log::info!("Not Support ConstantExpressionUnary");
+                log::debug!("Not Support ConstantExpressionUnary");
                 "".into()
             }
             Some(RefNode::ConstantExpressionTernary(t)) => {
-                log::info!("Not Support ConstantExpressionTernary");
+                log::debug!("Not Support ConstantExpressionTernary");
                 "".into()
             }
             _ => {
-                log::info!("Not Support Expression");
+                log::debug!("Not Support Expression");
                 "".into()
             }
         }
@@ -282,7 +284,7 @@ impl<'a> VerilogParser<'a> {
             Some(RefNode::BinaryNumber(n)) => self.get_bin_number_string(RefNode::from(n)),
             Some(RefNode::HexNumber(n)) => self.get_hex_number_string(RefNode::from(n)),
             Some(RefNode::OctalNumber(n)) => {
-                log::info!("cannot support OctalNumber");
+                log::debug!("cannot support OctalNumber");
                 None
             }
             _ => None,

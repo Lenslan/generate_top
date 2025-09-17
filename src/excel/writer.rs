@@ -48,10 +48,10 @@ impl ExcelWriter {
         let excel_name = parent_path.join(format!("{}.xlsx", module_name));
 
         if excel_name.exists() {
-            log::debug!("excel {} already exists", excel_name.display());
+            log::debug!("excel {} already exists, next is to update it", excel_name.display());
             self.update();
         } else {
-            log::debug!("excel {} does not exist", excel_name.display());
+            log::debug!("excel {} does not exist, next is to generate it", excel_name.display());
             self.generate();
         }
     }
@@ -63,7 +63,9 @@ impl ExcelWriter {
             .and_then(|s| s.to_str())
             .expect("Could not get module name");
         let excel_name = parent_path.join(format!("{}.xlsx", module_name));
+        log::info!(">> start to parse verilog source file");
         let module_v = self.get_module_from_v(module_name);
+        log::info!(">> start to parse excel file");
         let module_xlsx = self.get_module_from_excel(&excel_name);
 
         UndefineWireCollector::clear();
@@ -80,11 +82,13 @@ impl ExcelWriter {
 
                 // traverse all the port of `inst_v`
                 for p in inst_excel.same_ports_with(&inst_v) {
-                    let new_port = VerilogPort::copy_port_from(p);
+                    let mut new_port = VerilogPort::copy_port_from(p);
+                    new_port.check_health();
                     inst_module.add_port_inst(new_port);
                 }
                 for p in inst_v.diff_ports_with(&inst_excel) {
-                    let new_port = VerilogPort::copy_port_from(p);
+                    let mut new_port = VerilogPort::copy_port_from(p);
+                    new_port.check_health();
                     inst_module.add_port_inst(new_port);
                 }
                 module.add_inst_module(Arc::new(RefCell::new(inst_module)));
