@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;

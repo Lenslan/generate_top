@@ -10,13 +10,13 @@ use crate::verilog::port::{UndefineWireCollector, VerilogPort, VerilogValue};
 use crate::verilog::wire::WireBuilder;
 
 #[derive(Default)]
-struct ExcelWriter {
+pub struct ExcelWriter {
     module_dir_path: PathBuf,
     file_list: Vec<PathBuf>,
 }
 
 impl ExcelWriter {
-    fn new(module_dir_path: PathBuf) -> Self {
+    pub fn new(module_dir_path: PathBuf) -> Self {
         Self {
             module_dir_path,
             ..Default::default()
@@ -39,7 +39,7 @@ impl ExcelWriter {
         self.write_excel(excel_name, module);
     }
 
-    fn generate_or_update(&self) {
+    pub fn generate_or_update(&self) {
         let parent_path = self.module_dir_path.parent().expect("Could not get parent path");
         let module_name = self.module_dir_path
             .file_name()
@@ -173,7 +173,7 @@ impl ExcelWriter {
         ExcelReader::new(path.clone()).get_excel_info()
     }
 
-    fn traverse_v(&mut self) {
+    pub fn traverse_v(&mut self) {
         log::debug!("Traversing verilog files in dir {}", self.module_dir_path.display());
         let mut dir_list = Vec::new();
         let mut excel_list = Vec::new();
