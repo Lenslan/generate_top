@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use crate::excel::reader::ExcelReader;
 use std::path::PathBuf;
 use std::sync::Arc;
+use colored::Colorize;
 use regex::Regex;
 use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, FormatUnderline, RowNum, Workbook, Worksheet};
 use walkdir::WalkDir;
@@ -119,8 +120,10 @@ impl ExcelWriter {
             new_port.register_port_as_wire();
             module.add_port_inst(new_port);
         }
+        log::info!("{}", "======>  Change Messages  <======".bright_purple().bold());
         for p in temp_module.diff_ports_with(&module_xlsx) {
             log::debug!("add port in rtl but not in xlsx: {}", p.name);
+            log::info!("add port {} by verilog source file", p.name);
             let mut new_port = VerilogPort::copy_main_port_from(p);
             new_port.register_port_as_wire();
             module.add_port_inst(new_port);
@@ -128,13 +131,16 @@ impl ExcelWriter {
         for p in module_xlsx.diff_ports_with(&temp_module) {
             if WireBuilder::find_wire_in(p) {
                 log::debug!("add wire in xlsx but not in rtl: {}", p.name);
+                log::info!("add port {} by excel file", p.name);
                 let mut new_port = VerilogPort::copy_main_port_from(p);
                 new_port.register_port_as_wire();
                 module.add_port_inst(new_port);
             } else {
                 log::debug!("Port {} in xlsx but not in rtl was dropped", p.name);
+                log::info!("{} {}","drop port".bright_black(), p.name.bright_black());
             }
         }
+        log::info!("{}", "<======  Change Messages  ======>".bright_purple().bold());
 
         WireBuilder::check_health();
 
