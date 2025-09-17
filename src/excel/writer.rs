@@ -2,7 +2,8 @@ use std::cell::RefCell;
 use crate::excel::reader::ExcelReader;
 use std::path::PathBuf;
 use std::sync::Arc;
-use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, RowNum, Workbook, Worksheet};
+use regex::Regex;
+use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, FormatUnderline, RowNum, Workbook, Worksheet};
 use walkdir::WalkDir;
 use crate::verilog::module::VerilogModule;
 use crate::verilog::parse::VerilogParser;
@@ -235,6 +236,8 @@ impl ExcelWriter {
             .set_align(FormatAlign::Center);
         let number_format = Format::new()
             .set_align(FormatAlign::Left);
+        let same_wire_port_format = Format::new()
+            .set_underline(FormatUnderline::Single);
         let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-comment"];
         let width_list = [30, 10, 10, 30, 40];
 
@@ -253,16 +256,29 @@ impl ExcelWriter {
             sheet.write((idx + 2) as RowNum, 0, &port.name).unwrap();
             sheet.write((idx + 2) as RowNum, 1, format!("{}", port.inout)).unwrap();
             sheet.write_with_format((idx + 2) as RowNum, 2, port.width as u32, &number_format).unwrap();
-            sheet.write((idx + 2) as RowNum, 3, port.get_signal_string()
-                .replace('{',"")
-                .replace('}',"")
-            ).unwrap();
+            let signal_string = port.get_signal_string()
+                .replace('{', "")
+                .replace('}', "");
+            if Self::drop_bracket(&signal_string) == port.name && port.signals.len() == 2 {
+                sheet.write_with_format((idx + 2) as RowNum, 3, signal_string, &same_wire_port_format).unwrap();
+            } else {
+                sheet.write((idx + 2) as RowNum, 3, signal_string).unwrap();
+            }
             sheet.write((idx + 2) as RowNum, 4, &port.info).unwrap();
             sheet.set_row_height((idx + 2) as RowNum, 16).unwrap();
         }
 
         sheet.set_freeze_panes(2, 0).unwrap();
         sheet
+    }
+
+    fn drop_bracket(s: &str) -> &str {
+        let name_re = Regex::new(r"\b[a-zA-Z_]\w*\b").unwrap();
+        if let Some(res) = name_re.find(s) {
+            res.as_str()
+        } else {
+            ""
+        }
     }
 
 

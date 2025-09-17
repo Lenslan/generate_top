@@ -81,7 +81,6 @@ impl ExcelReader {
 
         log::debug!("end extract excel file {}", self.path.display());
 
-
         module
     }
 
