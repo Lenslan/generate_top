@@ -3,10 +3,9 @@ use crate::verilog::port::VerilogValue::{Number, Wire};
 use crate::verilog::wire::{VerilogWire, WireBuilder};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fmt::format;
 use std::ops::Range;
 use std::sync::{LazyLock, Mutex};
-use std::{fmt, sync::Arc, vec};
+use std::{sync::Arc, vec};
 use std::hash::{Hash, Hasher};
 use strum::Display;
 use crate::verilog::VerilogBase;
@@ -106,7 +105,7 @@ impl VerilogPort {
         for sig in self.signals.iter() {
             match sig {
                 Wire(_, range) => width_sum += range.len(),
-                Number { width, value } => width_sum += width_sum,
+                Number { width, value: _value } => width_sum += *width as usize,
                 _ => {}
             }
         }

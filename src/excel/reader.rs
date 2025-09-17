@@ -150,6 +150,8 @@ impl ExcelReader {
         }
     }
 
+    /// extract message from one sheet
+    /// return Portlist & inst_name
     fn extract_port(range: &Range<Data>) -> (Vec<VerilogPort>, Option<&String>) {
         let mut port_list = Vec::new();
         let mut inst_name = None;
@@ -172,7 +174,8 @@ impl ExcelReader {
                     new_port.set_info_msg(&s);
                 }
                 Self::match_wires_by_re(&mut new_port, wire_name);
-                new_port.check_health();
+                // Dont exec check_health() function, used by the function caller
+                // new_port.check_health();
 
                 port_list.push(new_port);
             }
@@ -211,6 +214,7 @@ mod test {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let file = ExcelReader::new("src/excel/test/uart.xlsx".into());
         file.generate_v();
+        // let module = file.get_excel_info();
         // WireBuilder::builder_show();
         // println!("{:#?}", module);
     }

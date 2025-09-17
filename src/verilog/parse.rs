@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use sv_parser::{
-    ConstantExpression, Define, Defines, IntegralNumber, ModuleDeclarationAnsi, PortDeclaration,
+    ConstantExpression, Define, PortDeclaration,
     PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node,
 };
 
@@ -31,7 +31,7 @@ impl<'a> VerilogParser<'a> {
         }
     }
 
-    pub fn add_define(mut self, define: Define) -> Self {
+    pub fn add_define(self, _define: Define) -> Self {
         todo!("不知道hashmap的键值是啥");
         self
     }

@@ -5,7 +5,6 @@ mod excel;
 mod utils;
 mod verilog;
 
-use verilog::wire::VerilogWire;
 
 fn main() {
     let mut a = vec![1, 2, 3];

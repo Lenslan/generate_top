@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use std::cmp::max;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
@@ -172,12 +172,12 @@ impl WireBuilder {
         let mut res = vec![false];
         let judge = |name: &str| {
             if let Some((_, payload)) = wire_builder.wires.get(name) {
-                let width = max(
+                let width = 1+max(
                     payload.driver.iter().max().unwrap_or(&0),
                     payload.load.iter().max().unwrap_or(&0)
                 );
 
-                if *width == port.width {
+                if width == port.width {
                     match port.inout {
                         PortDir::InPort => {
                             if payload.load.len() > 0 { return true }
@@ -194,7 +194,7 @@ impl WireBuilder {
         };
         for wire in port.signals.iter() {
             res.push(match wire {
-                VerilogValue::Wire(w, range) => judge(&w.name),
+                VerilogValue::Wire(w, _range) => judge(&w.name),
                 VerilogValue::UndefinedWire(s) => judge(s),
                 VerilogValue::Number { .. } => true,
                 VerilogValue::NONE => judge(&port.name)
@@ -229,7 +229,11 @@ impl WireBuilder {
         for item in wire_builder.wires.values() {
             if item.0.need_declaration() {
                 let name = item.0.name.clone();
-                let width = WireBuilder::get_width(&name);
+                // let width = WireBuilder::get_width(&name);
+                let width = 1+max(
+                    item.1.driver.iter().max().unwrap_or(&0),
+                    item.1.load.iter().max().unwrap_or(&0)
+                );
                 res.push((width, name));
             }
         }

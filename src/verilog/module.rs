@@ -6,8 +6,8 @@ use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
 use crate::verilog::VerilogBase;
 
-const INST_NAME_LEN: u8 = 30;
-const INST_SIGNAL_LEN: u8 = 30;
+const INST_NAME_LEN: u8 = 20;
+const INST_SIGNAL_LEN: u8 = 25;
 #[derive(Default, Debug)]
 pub struct VerilogModule {
     pub module_name: String,
@@ -236,25 +236,43 @@ impl VerilogModule {
                 last_port.name,
                 info
             ));
-            res.push(");\n\n".to_string());
+            res.push(");\n".to_string());
         }
 
         // wire definition
         let s = WireBuilder::traverse_unport_wires()
             .iter()
             .map(|(width, name)| {
+                let width_str = if *width < 2 {
+                    " ".repeat(8)
+                }else {
+                    format!("[{:<4}:0]", width-1)
+                };
                 format!(
-                    "{}wire {:<20} {}",
-                    " ".repeat(4),
-                    format!("[{}:0]", width - 1),
+                    "wire {} {:<20};",
+                    width_str,
                     name
                 )
             })
             .collect::<Vec<String>>();
         res.extend(s.into_iter().map(|s| format!("{}{}", " ".repeat(indent), s)).collect::<Vec<String>>());
+        res.push("\n".to_string());
 
         // port wire connected
-
+        let temp = self.port_list.iter()
+            .filter_map(|item| {
+                if item.signals.len() > 1 {
+                    Some(format!(
+                        "{}assign {:<20} = {:<25};",
+                        " ".repeat(indent),
+                        item.name,
+                        item.get_signal_string()
+                    ))
+                } else { None }
+            })
+            .collect::<Vec<String>>();
+        res.extend(temp);
+        res.push("\n".to_string());
 
         // inst info
         for inst in self.inst_list.iter() {

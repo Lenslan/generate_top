@@ -3,8 +3,6 @@ pub mod parse;
 pub mod port;
 pub mod wire;
 mod writer;
-mod error;
-
 
 
 trait VerilogBase {
