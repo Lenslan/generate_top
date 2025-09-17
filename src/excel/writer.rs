@@ -83,12 +83,12 @@ impl ExcelWriter {
 
                 // traverse all the port of `inst_v`
                 for p in inst_excel.same_ports_with(&inst_v) {
-                    let mut new_port = VerilogPort::copy_port_from(p);
+                    let mut new_port = VerilogPort::copy_inst_port_from(p);
                     new_port.check_health();
                     inst_module.add_port_inst(new_port);
                 }
                 for p in inst_v.diff_ports_with(&inst_excel) {
-                    let mut new_port = VerilogPort::copy_port_from(p);
+                    let mut new_port = VerilogPort::copy_inst_port_from(p);
                     new_port.check_health();
                     inst_module.add_port_inst(new_port);
                 }
@@ -114,20 +114,20 @@ impl ExcelWriter {
         // add port
         for p in module_xlsx.same_ports_with(&temp_module) {
             log::debug!("add port in rtl & xlsx: {}", p.name);
-            let mut new_port = VerilogPort::copy_port_from(p);
+            let mut new_port = VerilogPort::copy_main_port_from(p);
             new_port.register_port_as_wire();
             module.add_port_inst(new_port);
         }
         for p in temp_module.diff_ports_with(&module_xlsx) {
             log::debug!("add port in rtl but not in xlsx: {}", p.name);
-            let mut new_port = VerilogPort::copy_port_from(p);
+            let mut new_port = VerilogPort::copy_main_port_from(p);
             new_port.register_port_as_wire();
             module.add_port_inst(new_port);
         }
         for p in module_xlsx.diff_ports_with(&temp_module) {
             if WireBuilder::find_wire_in(p) {
                 log::debug!("add wire in xlsx but not in rtl: {}", p.name);
-                let mut new_port = VerilogPort::copy_port_from(p);
+                let mut new_port = VerilogPort::copy_main_port_from(p);
                 new_port.register_port_as_wire();
                 module.add_port_inst(new_port);
             } else {

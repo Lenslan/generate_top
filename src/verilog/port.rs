@@ -24,6 +24,7 @@ pub struct VerilogPort {
 
     health_checked: bool,
     undefine_registered: bool,
+    main_port_flag:bool,   // indicate this port is main module port, not inst module port
 }
 impl VerilogPort {
     pub fn new(inout: PortDir, name: &str, width: usize) -> Self {
@@ -41,6 +42,7 @@ impl VerilogPort {
     }
 
     pub fn register_port_as_wire(&mut self) {
+        self.main_port_flag = true;
         if self.signals.len() > 1 {
             self.check_health();
             return;
@@ -58,10 +60,13 @@ impl VerilogPort {
     /// register wires by WireBuilder
     ///
     fn connect_wire(&self, sig: &str, range: &Range<usize>) -> Arc<VerilogWire> {
-        match self.inout {
-            PortDir::InPort => WireBuilder::add_load_wire(sig, range),
-            PortDir::OutPort => WireBuilder::add_driver_wire(sig, range),
-            _ => WireBuilder::add_load_wire(sig, range), //TODO how to process inout port
+        match (self.main_port_flag, self.inout) {
+            (false, PortDir::InPort) => WireBuilder::add_load_wire(sig, range),
+            (false, PortDir::OutPort) => WireBuilder::add_driver_wire(sig, range),
+            (false, _) => WireBuilder::add_load_wire(sig, range), //TODO how to process inout port
+            (true, PortDir::InPort) => WireBuilder::add_driver_wire(sig, range),
+            (true, PortDir::OutPort) => WireBuilder::add_load_wire(sig, range),
+            (true, _) => WireBuilder::add_driver_wire(sig, range), //TODO how to process inout port
         }
     }
 
@@ -70,7 +75,9 @@ impl VerilogPort {
     /// those width will be inferred by `set_undefine_wire`
     /// or `solve_func`
     ///
-    pub fn connect_undefined_signal(&mut self, sig: &str) {
+    /// !!! face to user !!!
+    pub fn connect_undefined_signal(&mut self, sig: &str, flag: bool) {
+        self.main_port_flag = flag;
         self.signals.push(VerilogValue::UndefinedWire(sig.into()));
         self.has_undefine += 1;
     }
@@ -80,13 +87,15 @@ impl VerilogPort {
     ///
     pub fn connect_self(&mut self) {
         let name = self.name.clone();
-        self.connect_undefined_signal(&name);
+        self.connect_undefined_signal(&name, false);
     }
 
     ///
     /// register wires whose width is declared
     ///
-    pub fn connect_partial_signal(&mut self, sig: &str, range: &Range<usize>) {
+    /// !!! face to user !!!
+    pub fn connect_partial_signal(&mut self, sig: &str, range: &Range<usize>, flag: bool) {
+        self.main_port_flag = flag;
         let wire = self.connect_wire(sig, range);
         self.signals.push(Wire(Arc::clone(&wire), range.clone()));
     }
@@ -212,7 +221,7 @@ impl VerilogPort {
         };
     }
 
-    pub fn copy_port_from(p: &VerilogPort) -> Self {
+    pub fn copy_inst_port_from(p: &VerilogPort) -> Self {
         let mut new_port = VerilogPort::new(p.inout, &p.name, p.width);
         if p.info.len() > 0 {
             new_port.set_info_msg(&p.info)
@@ -220,10 +229,34 @@ impl VerilogPort {
         for sig in p.signals.iter() {
             match sig {
                 VerilogValue::Wire(w, range) => {
-                    new_port.connect_partial_signal(&w.name, range);
+                    new_port.connect_partial_signal(&w.name, range, false);
                 }
                 VerilogValue::UndefinedWire(s) => {
-                    new_port.connect_undefined_signal(s);
+                    new_port.connect_undefined_signal(s, false);
+                }
+                VerilogValue::Number { width, value } => {
+                    new_port.connect_number_signal(*value, *width);
+                }
+                VerilogValue::NONE => {}
+            }
+        }
+        // dont check_health, since do this by function caller
+        // new_port.check_health();
+        new_port
+    }
+
+    pub fn copy_main_port_from(p: &VerilogPort) -> Self {
+        let mut new_port = VerilogPort::new(p.inout, &p.name, p.width);
+        if p.info.len() > 0 {
+            new_port.set_info_msg(&p.info)
+        }
+        for sig in p.signals.iter() {
+            match sig {
+                VerilogValue::Wire(w, range) => {
+                    new_port.connect_partial_signal(&w.name, range, true);
+                }
+                VerilogValue::UndefinedWire(s) => {
+                    new_port.connect_undefined_signal(s, true);
                 }
                 VerilogValue::Number { width, value } => {
                     new_port.connect_number_signal(*value, *width);
@@ -474,9 +507,9 @@ mod test {
     fn test_port() {
         simple_logger::init_with_level(log::Level::Info).unwrap();
         let mut port1 = VerilogPort::new(PortDir::InPort, "port1", 6);
-        port1.connect_undefined_signal("wire1");
+        port1.connect_undefined_signal("wire1", false);
         let mut port2 = VerilogPort::new(PortDir::OutPort, "port2", 6);
-        port2.connect_partial_signal("wire1", &(0..3));
+        port2.connect_partial_signal("wire1", &(0..3), false);
 
         WireBuilder::builder_show();
         WireBuilder::check_health();

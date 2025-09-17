@@ -92,7 +92,7 @@ impl VerilogModule {
     pub fn copy_module_from(other: &VerilogModule) -> VerilogModule{
         let mut new_module = VerilogModule::new(other.module_name.clone());
         for p in other.port_list.iter() {
-            let mut new_port = VerilogPort::copy_port_from(p);
+            let mut new_port = VerilogPort::copy_inst_port_from(p);
             new_port.check_health();
             new_module.add_port_inst(new_port);
         }
@@ -310,12 +310,12 @@ mod test {
         module.fix_inst_name("u_test_module");
         let mut port1 = VerilogPort::new(PortDir::InPort, "port1", 12);
         port1.set_info_msg("test1 info message");
-        port1.connect_partial_signal("wire1", &(0..4));
-        port1.connect_partial_signal("wire2", &(0..5));
-        port1.connect_partial_signal("wire3", &(0..3));
+        port1.connect_partial_signal("wire1", &(0..4), false);
+        port1.connect_partial_signal("wire2", &(0..5), false);
+        port1.connect_partial_signal("wire3", &(0..3), false);
         println!("{:?}", port1.signals);
         let mut port2 = VerilogPort::new(PortDir::InPort, "port2", 12);
-        port2.connect_undefined_signal("undefined-wires");
+        port2.connect_undefined_signal("undefined-wires", false);
         let mut port3 = VerilogPort::new(
             PortDir::OutPort,
             "pordddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddt3",

@@ -52,7 +52,7 @@ impl ExcelReader {
         let mut module = VerilogModule::new(sheets[0].clone());
         // extract module ports
         if let Ok(range) = workbook.worksheet_range(module_name) {
-            let (port_list, inst_name) = Self::extract_port(&range);
+            let (port_list, inst_name) = Self::extract_port(&range, true);
             module.add_ports(port_list);
             if let Some(s) = inst_name {
                 module.fix_inst_name(s);
@@ -65,7 +65,7 @@ impl ExcelReader {
             log::debug!("Extracting sheet {}", inst_name);
             let mut inst_module = VerilogModule::new(String::from(inst_name));
             if let Ok(range) = workbook.worksheet_range(inst_name) {
-                let (port_list, inst_name) = Self::extract_port(&range);
+                let (port_list, inst_name) = Self::extract_port(&range, false);
                 inst_module.add_ports(port_list);
                 if let Some(s) = inst_name {
                     inst_module.fix_inst_name(s);
@@ -119,7 +119,7 @@ impl ExcelReader {
         }
     }
 
-    fn match_wires_by_re(port: &mut VerilogPort, wires: Vec<String>) {
+    fn match_wires_by_re(port: &mut VerilogPort, wires: Vec<String>, flag: bool) {
         let name_re = Regex::new(r"\b[a-zA-Z_]\w*\b").unwrap();
         let name_range_re = Regex::new(r"(\b[a-zA-Z_]\w*\b)\s*\[\s*(\d+)\s*:\s*(\d+)\s*]").unwrap();
         let number_re = Regex::new(r"(\d+)'\s*([bodh])\s*([0-9a-fA-F_xzXZ]+)").unwrap();
@@ -130,7 +130,7 @@ impl ExcelReader {
                 let name = s.get(1).unwrap().as_str();
                 let range_end = s.get(2).unwrap().as_str().parse::<usize>().unwrap();
                 let range_start = s.get(3).unwrap().as_str().parse::<usize>().unwrap();
-                port.connect_partial_signal(name, &(range_start..(range_end+1)));
+                port.connect_partial_signal(name, &(range_start..(range_end+1)), flag);
                 log::debug!("=> Match range {}[{}:{}]", name, range_end, range_start);
             } else if let Some(s) = number_re.captures(&wire) {
                 let width = s.get(1).unwrap().as_str().parse::<u8>().unwrap();
@@ -145,7 +145,7 @@ impl ExcelReader {
                 log::debug!("=> Match number {}'d{}", width, val);
             } else if let Some(s) = name_re.find(&wire) {
                 let name = s.as_str();
-                port.connect_undefined_signal(name);
+                port.connect_undefined_signal(name, flag);
                 log::debug!("=> Match name {}",name);
             }
         }
@@ -153,7 +153,7 @@ impl ExcelReader {
 
     /// extract message from one sheet
     /// return Portlist & inst_name
-    fn extract_port(range: &Range<Data>) -> (Vec<VerilogPort>, Option<&String>) {
+    fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogPort>, Option<&String>) {
         let mut port_list = Vec::new();
         let mut inst_name = None;
         for (row_idx, row_data) in  range.rows().enumerate() {
@@ -174,7 +174,7 @@ impl ExcelReader {
                 if let Some(s) = port_info {
                     new_port.set_info_msg(&s);
                 }
-                Self::match_wires_by_re(&mut new_port, wire_name);
+                Self::match_wires_by_re(&mut new_port, wire_name, flag);
                 // Dont exec check_health() function, used by the function caller
                 // new_port.check_health();
 
@@ -205,7 +205,7 @@ mod test {
             "10'd34".to_string(),
             "8'ha9".to_string()
         ];
-        ExcelReader::match_wires_by_re(&mut port, test_vec);
+        ExcelReader::match_wires_by_re(&mut port, test_vec, false);
         println!("{}", port.to_inst_string(1,1));
 
     }
