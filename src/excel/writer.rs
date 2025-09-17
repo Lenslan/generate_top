@@ -34,6 +34,7 @@ impl ExcelWriter {
         log::debug!("start generate excel file {}", excel_name.display());
 
         let module = self.get_module_from_v(module_name);
+        WireBuilder::check_health();
 
         // write excel
         self.write_excel(excel_name, module);
@@ -134,8 +135,7 @@ impl ExcelWriter {
             }
         }
 
-
-
+        WireBuilder::check_health();
 
         self.write_excel(excel_name, module);
 
@@ -167,7 +167,9 @@ impl ExcelWriter {
 
         // 遍历wire builder 将所有没有驱动/没有load的信号连接到端口
         for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
-            module.add_port(inout, &name, width as u32)
+            let mut new_port = VerilogPort::new(inout, &name, width);
+            new_port.register_port_as_wire();
+            module.add_port_inst(new_port);
         }
 
         module
@@ -233,7 +235,7 @@ impl ExcelWriter {
             .set_align(FormatAlign::Center);
         let number_format = Format::new()
             .set_align(FormatAlign::Left);
-        let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-info"];
+        let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-comment"];
         let width_list = [30, 10, 10, 30, 40];
 
         sheet.set_name(&module.module_name).unwrap();

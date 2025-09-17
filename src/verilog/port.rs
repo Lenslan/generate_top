@@ -70,13 +70,17 @@ impl VerilogPort {
     /// those width will be inferred by `set_undefine_wire`
     /// or `solve_func`
     ///
-    pub fn connect_self(&mut self) {
-        let name = self.name.clone();
-        self.connect_undefined_signal(&name);
-    }
     pub fn connect_undefined_signal(&mut self, sig: &str) {
         self.signals.push(VerilogValue::UndefinedWire(sig.into()));
         self.has_undefine += 1;
+    }
+
+    ///
+    /// register port wire as self
+    ///
+    pub fn connect_self(&mut self) {
+        let name = self.name.clone();
+        self.connect_undefined_signal(&name);
     }
 
     ///
