@@ -11,6 +11,9 @@ use sv_parser::{
     ConstantExpression, Define, PortDeclaration,
     PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node,
 };
+use crate::verilog::parameter::Param;
+use crate::verilog::width::Width;
+use crate::verilog::width::Width::RawWidth;
 
 pub struct VerilogParser<'a> {
     file: &'a PathBuf,
@@ -88,6 +91,11 @@ impl<'a> VerilogParser<'a> {
                             "".into()
                         });
                     let mut module = VerilogModule::new(module_name);
+
+                    // add parameter list
+                    module.add_param_list(self.extract_params(RefNode::from(module_node)));
+
+                    //add port
                     module.add_ports(self.extract_ports(RefNode::from(module_node)));
 
                     // TODO add inst
@@ -115,6 +123,10 @@ impl<'a> VerilogParser<'a> {
             }
         }
         log::debug!("end extract module");
+    }
+
+    fn extract_params(&self, module_node: RefNode) -> Vec<Param> {
+        todo!()
     }
 
     fn extract_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
@@ -188,13 +200,13 @@ impl<'a> VerilogParser<'a> {
         port_list
     }
 
-    fn get_port_width(&self, port_node: RefNode) -> Option<usize> {
+    fn get_port_width(&self, port_node: RefNode) -> Option<Width> {
         log::debug!("extract port width >>>");
         if let Some(range) = unwrap_node!(port_node, PackedDimension) {
             log::debug!("find node {:?}", range);
             if let Some(RefNode::ConstantRange(range)) = unwrap_node!(range, ConstantRange) {
-                let upper = self.extract_expr(&range.nodes.0).calculate();
-                let lower = self.extract_expr(&range.nodes.2).calculate();
+                let upper = self.extract_expr(&range.nodes.0);
+                let lower = self.extract_expr(&range.nodes.2);
 
                 log::debug!("port range upper: {:?} and lower: {:?}", upper, lower);
                 if upper.is_ok() && lower.is_ok() {
@@ -213,11 +225,11 @@ impl<'a> VerilogParser<'a> {
                 None
             }
         } else {
-            Some(1)
+            Some(RawWidth(1))
         }
     }
 
-    fn extract_expr(&self, expr: &ConstantExpression) -> String {
+    fn extract_expr(&self, expr: &ConstantExpression) -> Width {
         match unwrap_node!(
             expr,
             ConstantPrimary,
@@ -276,8 +288,8 @@ impl<'a> VerilogParser<'a> {
         }
     }
 
-    fn get_literal_string(&self, node: RefNode) -> Option<String> {
-        match unwrap_node!(node, DecimalNumber, BinaryNumber, HexNumber, OctalNumber) {
+    fn get_literal_string(&self, node: RefNode) -> Option<Width> {
+        match unwrap_node!(node, DecimalNumber, BinaryNumber, HexNumber, OctalNumber, PsOrHierarchicalTfIdentifier) {
             Some(RefNode::DecimalNumber(n)) => self.get_dec_number_string(RefNode::from(n)),
             Some(RefNode::BinaryNumber(n)) => self.get_bin_number_string(RefNode::from(n)),
             Some(RefNode::HexNumber(n)) => self.get_hex_number_string(RefNode::from(n)),
@@ -285,6 +297,7 @@ impl<'a> VerilogParser<'a> {
                 log::debug!("cannot support OctalNumber");
                 None
             }
+            Some(RefNode::PsOrHierarchicalTfIdentifier(n)) => self.get_identifier_string(RefNode::from(n)),
             _ => None,
         }
     }
@@ -302,7 +315,7 @@ impl<'a> VerilogParser<'a> {
         }
     }
 
-    fn get_dec_number_string(&self, node: RefNode) -> Option<String> {
+    fn get_dec_number_string(&self, node: RefNode) -> Option<Width> {
         if let Some(RefNode::UnsignedNumber(number)) = unwrap_node!(node, UnsignedNumber) {
             let locate = number.nodes.0;
             self.parse_res
@@ -315,7 +328,7 @@ impl<'a> VerilogParser<'a> {
         }
     }
 
-    fn get_bin_number_string(&self, node: RefNode) -> Option<String> {
+    fn get_bin_number_string(&self, node: RefNode) -> Option<Width> {
         if let Some(RefNode::BinaryNumber(number)) = unwrap_node!(node, BinaryNumber) {
             let locate = number.nodes.2.nodes.0;
             self.parse_res.as_ref().unwrap().get_str(&locate).map(|s| {
@@ -332,7 +345,7 @@ impl<'a> VerilogParser<'a> {
         }
     }
 
-    fn get_hex_number_string(&self, node: RefNode) -> Option<String> {
+    fn get_hex_number_string(&self, node: RefNode) -> Option<Width> {
         if let Some(RefNode::HexNumber(number)) = unwrap_node!(node, HexNumber) {
             let locate = number.nodes.2.nodes.0;
             self.parse_res.as_ref().unwrap().get_str(&locate).map(|s| {

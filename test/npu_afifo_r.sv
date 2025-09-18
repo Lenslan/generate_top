@@ -22,7 +22,9 @@ module npu_afifo_r
    input  logic                        read_clk,
    input  logic                        read_rst,
    input  logic                        read_soft_rst,
+   `ifdef test_macro
    output logic                        read_valid,
+   `endif 
    input  logic                        read_accept,
    output logic [FIFO_DATA_WIDTH-1:0]  read_data,
   //  output logic [`NUM_FLANES(FIFO_DATA_WIDTH)-1:0][(1<<FIFO_SIZEL2)-1:0] rdpnt,

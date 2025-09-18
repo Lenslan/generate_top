@@ -4,6 +4,7 @@ use std::ops::Deref;
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
+use crate::verilog::parameter::Param;
 use crate::verilog::VerilogBase;
 
 const INST_NAME_LEN: u8 = 20;
@@ -12,6 +13,7 @@ const INST_SIGNAL_LEN: u8 = 25;
 pub struct VerilogModule {
     pub module_name: String,
     pub inst_name: Option<String>,
+    pub param_list: Vec<Param>,
     pub port_list: Vec<VerilogPort>,
     pub inst_list: Vec<Arc<RefCell<VerilogModule>>>,
 }
@@ -41,6 +43,10 @@ impl VerilogModule {
 
     pub fn add_inst_module(&mut self, module: Arc<RefCell<VerilogModule>>) {
         self.inst_list.push(module);
+    }
+    
+    pub fn add_param_list(&mut self, param_list: Vec<Param>) {
+        self.param_list.extend(param_list);
     }
     
     ///
@@ -156,7 +162,7 @@ impl VerilogModule {
     ///
     /// output instance String
     ///
-    fn to_inst_string(&self) -> Vec<String> {
+    pub fn to_inst_string(&self) -> Vec<String> {
         let mut res = Vec::new();
         res.push(format!(
             "{} {} (",
