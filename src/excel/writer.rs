@@ -53,9 +53,11 @@ impl ExcelWriter {
         if excel_name.exists() {
             log::debug!("excel {} already exists, next is to update it", excel_name.display());
             self.update();
+            log::info!("excel {} update over!", excel_name.display());
         } else {
             log::debug!("excel {} does not exist, next is to generate it", excel_name.display());
             self.generate();
+            log::info!("excel {} generate over!", excel_name.display());
         }
     }
 
