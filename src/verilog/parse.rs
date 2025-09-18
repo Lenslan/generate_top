@@ -3,7 +3,7 @@ use crate::verilog::module::VerilogModule;
 use crate::verilog::port::{PortDir, VerilogPort};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io;
+use std::{io, usize};
 use std::io::Write;
 use std::path::PathBuf;
 use colored::Colorize;
@@ -138,9 +138,7 @@ impl<'a> VerilogParser<'a> {
                 let inout = Self::get_direction(port_dir);
 
                 //port width
-                let width = self
-                    .get_port_width(RefNode::from(port_dir))
-                    .unwrap_or_default();
+                let width = self.get_port_width(RefNode::from(port_dir));
 
                 // port name
                 for port_node in unwrap_node!(port_dir, ListOfPortIdentifiers)
@@ -154,7 +152,7 @@ impl<'a> VerilogParser<'a> {
                                 log::error!("Can not extract port name");
                                 "".into()
                             });
-                        let port_inst = VerilogPort::new(inout.clone(), &port_name, width);
+                        let port_inst = VerilogPort::new(inout.clone(), &port_name, width.clone());
                         port_list.push(port_inst);
                     }
                 }
@@ -178,9 +176,7 @@ impl<'a> VerilogParser<'a> {
                     PortDir::Unknown
                 };
 
-                let width = self
-                    .get_port_width(RefNode::from(port_dir))
-                    .unwrap_or_default();
+                let width = self.get_port_width(RefNode::from(port_dir));
 
                 let port_name = if let Some(id) = unwrap_node!(port_dir, PortIdentifier) {
                     self.get_identifier_string(id).unwrap_or_else(|| {
@@ -200,7 +196,7 @@ impl<'a> VerilogParser<'a> {
         port_list
     }
 
-    fn get_port_width(&self, port_node: RefNode) -> Option<Width> {
+    fn get_port_width(&self, port_node: RefNode) -> Width {
         log::debug!("extract port width >>>");
         if let Some(range) = unwrap_node!(port_node, PackedDimension) {
             log::debug!("find node {:?}", range);
@@ -209,23 +205,13 @@ impl<'a> VerilogParser<'a> {
                 let lower = self.extract_expr(&range.nodes.2);
 
                 log::debug!("port range upper: {:?} and lower: {:?}", upper, lower);
-                if upper.is_ok() && lower.is_ok() {
-                    Some(upper.unwrap() - lower.unwrap() + 1)
-                } else {
-                    if upper.is_err() {
-                        log::warn!("Port upper is {}", upper.unwrap_err());
-                    }
-                    if lower.is_err() {
-                        log::warn!("Port lower is {}", lower.unwrap_err());
-                    }
-                    None
-                }
+                upper - lower + 1
             } else {
-                log::debug!("cannot find node ConstantRange");
-                None
+                log::debug!("[extract width] Cannot find node ConstantRange");
+                RawWidth(1)
             }
         } else {
-            Some(RawWidth(1))
+            RawWidth(1)
         }
     }
 
@@ -252,18 +238,27 @@ impl<'a> VerilogParser<'a> {
                         log::error!("Can not extract operator");
                         "".into()
                     });
-                format!("{}{}{}", left, op, right)
+                match (&left, &right) { 
+                    (RawWidth(x), RawWidth(y)) => {
+                        match op.as_str() {
+                            "+" => RawWidth(x+y),
+                            "-" => RawWidth(x-y),
+                            _ => format!("{}{}{}", left, op, right).into()
+                        }
+                    }  
+                    _ => format!("{}{}{}", left, op, right).into()
+                }
             }
             Some(RefNode::ConstantExpressionUnary(t)) => {
-                log::debug!("Not Support ConstantExpressionUnary");
+                log::warn!("Not Support ConstantExpressionUnary");
                 "".into()
             }
             Some(RefNode::ConstantExpressionTernary(t)) => {
-                log::debug!("Not Support ConstantExpressionTernary");
+                log::warn!("Not Support ConstantExpressionTernary");
                 "".into()
             }
             _ => {
-                log::debug!("Not Support Expression");
+                log::warn!("Not Support Expression");
                 "".into()
             }
         }
@@ -297,7 +292,8 @@ impl<'a> VerilogParser<'a> {
                 log::debug!("cannot support OctalNumber");
                 None
             }
-            Some(RefNode::PsOrHierarchicalTfIdentifier(n)) => self.get_identifier_string(RefNode::from(n)),
+            Some(RefNode::PsOrHierarchicalTfIdentifier(n)) => 
+                self.get_identifier_string(RefNode::from(n)).and_then(|x| Some(x.into())),
             _ => None,
         }
     }
@@ -322,7 +318,7 @@ impl<'a> VerilogParser<'a> {
                 .as_ref()
                 .unwrap()
                 .get_str(&locate)
-                .map(|s| s.to_string())
+                .map(|s| s.parse::<usize>().unwrap().into())
         } else {
             None
         }
@@ -332,13 +328,10 @@ impl<'a> VerilogParser<'a> {
         if let Some(RefNode::BinaryNumber(number)) = unwrap_node!(node, BinaryNumber) {
             let locate = number.nodes.2.nodes.0;
             self.parse_res.as_ref().unwrap().get_str(&locate).map(|s| {
-                format!(
-                    "{}",
-                    i32::from_str_radix(s, 2).unwrap_or_else(|e| {
-                        log::error!("Can not extract binary number: {}", e);
-                        1
-                    })
-                )
+                usize::from_str_radix(s, 2).unwrap_or_else(|e| {
+                    log::error!("Can not extract binary number: {}", e);
+                    1
+                }).into()
             })
         } else {
             None
@@ -349,13 +342,10 @@ impl<'a> VerilogParser<'a> {
         if let Some(RefNode::HexNumber(number)) = unwrap_node!(node, HexNumber) {
             let locate = number.nodes.2.nodes.0;
             self.parse_res.as_ref().unwrap().get_str(&locate).map(|s| {
-                format!(
-                    "{}",
-                    i32::from_str_radix(s, 16).unwrap_or_else(|e| {
-                        log::error!("Can not extract hex number: {}", e);
-                        1
-                    })
-                )
+                usize::from_str_radix(s, 16).unwrap_or_else(|e| {
+                    log::error!("Can not extract hex number: {}", e);
+                    1
+                }).into()
             })
         } else {
             None

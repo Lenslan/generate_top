@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::ops::Deref;
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
@@ -28,9 +27,9 @@ impl VerilogModule {
     ///
     /// Adds a new port to the module's port list.
     ///
-    pub fn add_port(&mut self, inout: PortDir, name: &str, width: u32) {
+    pub fn add_port(&mut self, inout: PortDir, name: &str, width: usize) {
         self.port_list
-            .push(VerilogPort::new(inout, name, width as usize))
+            .push(VerilogPort::new(inout, name, width.into()))
     }
 
     pub fn add_port_inst(&mut self, port: VerilogPort) {
@@ -253,18 +252,18 @@ mod test {
         simple_logger::init_with_level(log::Level::Info).unwrap();
         let mut module = VerilogModule::new("test".to_string());
         module.fix_inst_name("u_test_module");
-        let mut port1 = VerilogPort::new(PortDir::InPort, "port1", 12);
+        let mut port1 = VerilogPort::new(PortDir::InPort, "port1", 12.into());
         port1.set_info_msg("test1 info message");
         port1.connect_partial_signal("wire1", &(0..4), false);
         port1.connect_partial_signal("wire2", &(0..5), false);
         port1.connect_partial_signal("wire3", &(0..3), false);
         println!("{:?}", port1.signals);
-        let mut port2 = VerilogPort::new(PortDir::InPort, "port2", 12);
+        let mut port2 = VerilogPort::new(PortDir::InPort, "port2", 12.into());
         port2.connect_undefined_signal("undefined-wires", false);
         let mut port3 = VerilogPort::new(
             PortDir::OutPort,
             "pordddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddt3",
-            12,
+            12.into(),
         );
         port3.connect_number_signal(43, 8);
         module.add_ports(vec![port1, port2, port3]);

@@ -91,11 +91,11 @@ impl ExcelReader {
         }
     }
 
-    fn extract_width(data: Option<&Data>) -> u32 {
+    fn extract_width(data: Option<&Data>) -> usize {
         match data {
-            Some(Data::Int(n)) => n.clone() as u32,
+            Some(Data::Int(n)) => n.clone() as usize,
             Some(Data::String(s)) => s.parse().unwrap(),
-            Some(Data::Float(n)) => n.clone() as u32,
+            Some(Data::Float(n)) => n.clone() as usize,
             _ => 0
         }
     }
@@ -169,7 +169,7 @@ impl ExcelReader {
                 let wire_name = Self::extract_wires(row_data.get(3));
                 let port_info = Self::extract_string(row_data.get(4));
 
-                let mut new_port = VerilogPort::new(inout, &port_name.unwrap(), width as usize);
+                let mut new_port = VerilogPort::new(inout, &port_name.unwrap(), width.into());
                 if let Some(s) = port_info {
                     new_port.set_info_msg(&s);
                 }
@@ -195,7 +195,7 @@ mod test {
     // #[test]
     fn test_re() {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
-        let mut  port = VerilogPort::new(PortDir::InPort, "test_port", 32);
+        let mut  port = VerilogPort::new(PortDir::InPort, "test_port", 32.into());
         let test_vec = vec![
             "testwire1".to_string(),
             "testwire2[3:0]".to_string(),
@@ -205,7 +205,7 @@ mod test {
             "8'ha9".to_string()
         ];
         ExcelReader::match_wires_by_re(&mut port, test_vec, false);
-        println!("{}", port.to_inst_string(1,1));
+        println!("{:#?}", port.to_inst_string(false));
 
     }
 

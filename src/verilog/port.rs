@@ -9,12 +9,13 @@ use std::{sync::Arc, vec};
 use std::hash::{Hash, Hasher};
 use strum::Display;
 use crate::verilog::VerilogBase;
+use crate::verilog::width::Width;
 
 #[derive(Debug, Default)]
 pub struct VerilogPort {
     pub inout: PortDir,
     pub name: String,
-    pub width: usize,
+    pub width: Width,
 
     pub info: String,
 
@@ -27,7 +28,7 @@ pub struct VerilogPort {
     main_port_flag:bool,   // indicate this port is main module port, not inst module port
 }
 impl VerilogPort {
-    pub fn new(inout: PortDir, name: &str, width: usize) -> Self {
+    pub fn new(inout: PortDir, name: &str, width: Width) -> Self {
         Self {
             inout,
             name: String::from(name),
@@ -48,9 +49,9 @@ impl VerilogPort {
             return;
         }
         match self.inout {
-            PortDir::InPort => WireBuilder::add_driver_wire_asport(&self.name, &(0..self.width)),
-            PortDir::OutPort => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width)),
-            _ => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width)), //TODO how to process inout port
+            PortDir::InPort => WireBuilder::add_driver_wire_asport(&self.name, &(0..self.width.width())),
+            PortDir::OutPort => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width.width())),
+            _ => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width.width())), //TODO how to process inout port
         };
         self.health_checked = true;
     }
@@ -135,9 +136,9 @@ impl VerilogPort {
     }
     fn set_undefine_wire_1(&mut self) {
         let width_sum = self.get_connected_width();
-        let wire_infer_width = self.width - width_sum;
+        let wire_infer_width = self.width.width() - width_sum;
         if wire_infer_width <= 0 {
-            log::warn!("[Infer Undefine-wire] Port {} has been over connected, port width is {}, but signal used already fill {} bits", self.name, self.width, width_sum);
+            log::warn!("[Infer Undefine-wire] Port {} has been over connected, port width is {}, but signal used already fill {} bits", self.name, self.width.width(), width_sum);
             return;
         }
         let (idx, signal) = self
@@ -155,9 +156,9 @@ impl VerilogPort {
     ///
     fn check_connected(&mut self) {
         let width_sum = self.get_connected_width();
-        match self.width.cmp(&width_sum) {
-            Ordering::Greater => log::warn!("Port {} has not been full connected, port width is {} but signal width is {}", self.name,self.width,width_sum),
-            Ordering::Less => log::warn!("Port {} has been over connected, port width is {} but signal width is {}", self.name, self.width,width_sum),
+        match self.width.width().cmp(&width_sum) {
+            Ordering::Greater => log::warn!("Port {} has not been full connected, port width is {} but signal width is {}", self.name,self.width.width(),width_sum),
+            Ordering::Less => log::warn!("Port {} has been over connected, port width is {} but signal width is {}", self.name, self.width.width(),width_sum),
             _ => {}
         }
         self.health_checked = true;
@@ -178,9 +179,9 @@ impl VerilogPort {
             }
         }
         let width = self.get_connected_width();
-        let infer_width = self.width - width;
+        let infer_width = self.width.width() - width;
         if infer_width <= 0 {
-            log::warn!("[Process Undefine-wire] Port {} has been over connected, port width is {}, bug signal used already fill {} bits", self.name, self.width, width);
+            log::warn!("[Process Undefine-wire] Port {} has been over connected, port width is {}, bug signal used already fill {} bits", self.name, self.width.width(), width);
         }
         UndefineWireCollector::add_func(func_group, infer_width as i64);
         self.undefine_registered = true;
@@ -222,7 +223,7 @@ impl VerilogPort {
     }
 
     pub fn copy_inst_port_from(p: &VerilogPort) -> Self {
-        let mut new_port = VerilogPort::new(p.inout, &p.name, p.width);
+        let mut new_port = VerilogPort::new(p.inout, &p.name, p.width.clone());
         if p.info.len() > 0 {
             new_port.set_info_msg(&p.info)
         }
@@ -246,7 +247,7 @@ impl VerilogPort {
     }
 
     pub fn copy_main_port_from(p: &VerilogPort) -> Self {
-        let mut new_port = VerilogPort::new(p.inout, &p.name, p.width);
+        let mut new_port = VerilogPort::new(p.inout, &p.name, p.width.clone());
         if p.info.len() > 0 {
             new_port.set_info_msg(&p.info)
         }
@@ -326,10 +327,10 @@ impl VerilogPort {
         } else {
             "".to_string()
         };
-        let width = if self.width < 2 {
+        let width = if self.width.width() < 2 {
             " ".repeat(8)
         } else {
-            format!("[{:<4}:0]", self.width-1)
+            format!("[{:<4}:0]", self.width.width()-1)
         };
         if is_last {
             vec![format!(
@@ -372,7 +373,7 @@ impl VerilogBase for VerilogPort {
 impl PartialEq for VerilogPort {
     fn eq(&self, other: &Self) -> bool {
         (self.inout == other.inout)
-            && (self.width == other.width)
+            && (self.width.width() == other.width.width())
             && (self.name == other.name)
     }
 }
@@ -381,7 +382,7 @@ impl Eq for VerilogPort {}
 impl Hash for VerilogPort {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
-        self.width.hash(state);
+        self.width.width().hash(state);
         self.inout.hash(state);
     }
 }
@@ -567,9 +568,9 @@ mod test {
     #[test]
     fn test_port() {
         simple_logger::init_with_level(log::Level::Info).unwrap();
-        let mut port1 = VerilogPort::new(PortDir::InPort, "port1", 6);
+        let mut port1 = VerilogPort::new(PortDir::InPort, "port1", 6.into());
         port1.connect_undefined_signal("wire1", false);
-        let mut port2 = VerilogPort::new(PortDir::OutPort, "port2", 6);
+        let mut port2 = VerilogPort::new(PortDir::OutPort, "port2", 6.into());
         port2.connect_partial_signal("wire1", &(0..3), false);
 
         WireBuilder::builder_show();

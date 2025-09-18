@@ -187,7 +187,7 @@ impl WireBuilder {
                     payload.load.iter().max().unwrap_or(&0)
                 );
 
-                if width == port.width {
+                if width == port.width.width() {
                     match port.inout {
                         PortDir::InPort => {
                             if payload.load.len() > 0 { return true }

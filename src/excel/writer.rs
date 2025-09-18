@@ -112,7 +112,7 @@ impl ExcelWriter {
 
         let mut temp_module = VerilogModule::new("temp".into());
         for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
-            temp_module.add_port(inout, &name, width as u32)
+            temp_module.add_port(inout, &name, width)
         }
 
         // add port
