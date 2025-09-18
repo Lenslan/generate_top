@@ -13,8 +13,7 @@ fn main() {
     let args = Args::parse();
     let module_path = PathBuf::from(args.top.clone());
     if !module_path.is_dir() {
-        log::error!("the path {} is not a directory", args.top);
-        std::process::exit(1);
+        panic!("the path {} is not a directory", args.top)
     }
 
     match args.command {

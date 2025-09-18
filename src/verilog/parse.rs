@@ -3,8 +3,10 @@ use crate::verilog::module::VerilogModule;
 use crate::verilog::port::{PortDir, VerilogPort};
 use std::collections::HashMap;
 use std::fs::File;
+use std::io;
 use std::io::Write;
 use std::path::PathBuf;
+use colored::Colorize;
 use sv_parser::{
     ConstantExpression, Define, PortDeclaration,
     PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node,
@@ -49,7 +51,7 @@ impl<'a> VerilogParser<'a> {
                 self.parse_res = Some(t.0)
             }
             Err(e) => {
-                log::error!("file {} parse error: {:?}", self.file.display(), e);
+                panic!("file {} parse error: {:?}", self.file.display(), e)
             }
         }
         self
@@ -65,10 +67,6 @@ impl<'a> VerilogParser<'a> {
     }
 
     pub fn extract_module(&mut self) {
-        if self.parse_res.is_none() {
-            log::error!("Cannot extract module");
-            std::process::exit(1);
-        }
         log::debug!("start extract module");
 
         let tree = self.parse_res.as_ref().unwrap();
@@ -371,7 +369,7 @@ mod test {
 
     #[test]
     fn test_base() {
-        simple_logger::init_with_level(log::Level::Info).unwrap();
+        simple_logger::init_with_level(log::Level::Debug).unwrap();
         let module_info = VerilogParser::new(&PathBuf::from("./test/npu_afifo_r.sv"))
             .parse()
             .solve()
