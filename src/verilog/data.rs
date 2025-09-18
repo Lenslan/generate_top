@@ -36,6 +36,27 @@ impl Data<VerilogModule> {
     }
 }
 
+impl Data<VerilogPort> {
+    
+    pub fn to_inst_string(&self, is_last: bool) -> Vec<String> {
+        match self {
+            Data::Raw(x) => {
+                x.to_inst_string(is_last)
+            }
+            Data::Macro {name, value} => {
+                res.push(format!("`ifdef {}", name));
+                res.extend(value.to_inst_string());
+                res.push(format!("`endif  // {}", name));
+                res
+            }
+        }
+    }
+}
+
+impl Data<Vec<VerilogPort>> {
+    pub fn to_inst_string
+}
+
 
 #[cfg(test)]
 mod test {

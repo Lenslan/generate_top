@@ -286,19 +286,80 @@ impl VerilogPort {
         signal_string
     }
 
-    pub fn to_inst_string(&self, name_len: u8, signal_len: u8) -> String {
+    ///
+    /// return String such as :
+    /// port_name ({wire1, wire2})
+    ///
+    fn to_port_wire_string(&self) -> String {
         let signal_string = self.get_signal_string();
         format!(
-            "{:<name_len$} ({:<sig_len$})",
+            "{:<20} ({:<30})",
             self.name,
             signal_string,
-            name_len = name_len as usize,
-            sig_len = signal_len as usize
         )
     }
 
-    pub fn to_port_string(&self) -> String {
-        todo!()
+    pub fn to_inst_string(&self, is_last: bool) -> Vec<String> {
+        let info = if self.info.len() > 0 {
+            format!(" // {}", self.info)
+        } else {
+            "".to_string()
+        };
+        if is_last {
+            vec![format!(
+                "    .{}{}",
+                self.to_port_wire_string(),
+                info
+            )]
+        } else {
+            vec![format!(
+                "    .{},{}",
+                self.to_port_wire_string(),
+                info
+            )]
+        }
+    }
+
+    pub fn to_port_string(&self, is_last: bool) -> Vec<String> {
+        let info = if self.info.len() > 0 {
+            format!(" // {}", self.info)
+        } else {
+            "".to_string()
+        };
+        let width = if self.width < 2 {
+            " ".repeat(8)
+        } else {
+            format!("[{:<4}:0]", self.width-1)
+        };
+        if is_last {
+            vec![format!(
+                "{:<10} wire {} {:<20}  {}",
+                self.inout,
+                width,
+                self.name,
+                info
+            )]
+        } else {
+            vec![format!(
+                "{:<10} wire {} {:<20},{}",
+                self.inout,
+                width,
+                self.name,
+                info
+            )]
+        }
+    }
+
+    pub fn to_assign_string(&self) -> Option<Vec<String>> {
+        if self.signals.len() > 1 {
+            Some(vec![format!(
+                "assign {:<20} = {:<30};",
+                self.name,
+                self.get_signal_string()
+            )])
+        } else {
+            None
+        }
     }
 }
 

@@ -172,27 +172,9 @@ impl VerilogModule {
 
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports {
-                let info = if port.info.len() > 0 {
-                    format!(" // {}", port.info)
-                } else {
-                    "".to_string()
-                };
-                res.push(format!(
-                    "    .{},{}",
-                    port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN),
-                    info
-                ));
+                res.extend(port.to_inst_string(false));
             }
-            let info = if last_port.info.len() > 0 {
-                format!("  // {}", last_port.info)
-            }else {
-                "".to_string()
-            };
-            res.push(format!(
-                "    .{}{}",
-                last_port.to_inst_string(INST_NAME_LEN, INST_SIGNAL_LEN),
-                info
-            ));
+            res.extend(last_port.to_inst_string(true));
             res.push(");".to_string());
         } else {
             log::error!("There is no port in module {}", self.module_name);
@@ -210,74 +192,31 @@ impl VerilogModule {
         // port info
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports.iter() {
-                let info = if port.info.len() > 0 {
-                    format!(" // {}", port.info)
-                }else { "".into() };
-                let width = if port.width < 2 {
-                    " ".repeat(8)
-                }else {
-                    format!("[{:<4}:0]", port.width-1)
-                };
-                res.push(format!(
-                    "{}{:<10} wire {} {:<20},{}",
-                    " ".repeat(indent),
-                    port.inout,
-                    width,
-                    port.name,
-                    info
-                ))
+                res.extend(port.to_port_string(false));
             }
-            let info = if last_port.info.len() > 0 {
-                format!("  // {}", last_port.info)
-            }else { "".into() };
-            let width = if last_port.width < 2 {
-                " ".repeat(8)
-            }else {
-                format!("[{:<4}:0]", last_port.width-1)
-            };
-            res.push(format!(
-                "{}{:<10} wire {} {:<20}{}",
-                " ".repeat(indent),
-                last_port.inout,
-                width,
-                last_port.name,
-                info
-            ));
+            
+            res.extend(last_port.to_port_string(true));
+
             res.push(");\n".to_string());
         }
 
         // wire definition
         let s = WireBuilder::traverse_unport_wires()
             .iter()
-            .map(|(width, name)| {
-                let width_str = if *width < 2 {
-                    " ".repeat(8)
-                }else {
-                    format!("[{:<4}:0]", width-1)
-                };
-                format!(
-                    "wire {} {:<20};",
-                    width_str,
-                    name
-                )
+            .flat_map(|w| {
+                w.to_string()
             })
-            .collect::<Vec<String>>();
+            .collect::<Vec<_>>();
         res.extend(s.into_iter().map(|s| format!("{}{}", " ".repeat(indent), s)).collect::<Vec<String>>());
         res.push("\n".to_string());
 
         // port wire connected
         let temp = self.port_list.iter()
             .filter_map(|item| {
-                if item.signals.len() > 1 {
-                    Some(format!(
-                        "{}assign {:<20} = {:<25};",
-                        " ".repeat(indent),
-                        item.name,
-                        item.get_signal_string()
-                    ))
-                } else { None }
+                item.to_assign_string()
             })
-            .collect::<Vec<String>>();
+            .flatten()
+            .collect::<Vec<_>>();
         res.extend(temp);
         res.push("\n".to_string());
 

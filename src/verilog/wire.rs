@@ -233,7 +233,7 @@ impl WireBuilder {
     ///
     /// traverse to find wires which need to be declared
     ///
-    pub fn traverse_unport_wires() -> Vec<(usize, String)> {
+    pub fn traverse_unport_wires() -> Vec<WirePrinter> {
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let mut res = Vec::new();
         for item in wire_builder.wires.values() {
@@ -244,7 +244,7 @@ impl WireBuilder {
                     item.1.driver.iter().max().unwrap_or(&0),
                     item.1.load.iter().max().unwrap_or(&0)
                 );
-                res.push((width, name));
+                res.push(WirePrinter::new(name, width));
             }
         }
         res
@@ -331,6 +331,32 @@ struct WireError {
 impl Borrow<str> for VerilogWire {
     fn borrow(&self) -> &str {
         &self.name
+    }
+}
+
+struct WirePrinter {
+    name: String,
+    width: usize
+}
+
+impl WirePrinter {
+    
+    pub fn new(name: String, width: usize) -> Self {
+        Self {
+            name, width
+        }
+    }
+    pub fn to_string(&self) -> Vec<String> {
+        let width_str = if self.width < 2 {
+            " ".repeat(8)
+        } else { 
+            format!("[{:<4}:0]", self.width-1)
+        };
+        vec![format!(
+            "wire {} {:<20}",
+            width_str,
+            self.name
+        )]
     }
 }
 
