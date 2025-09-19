@@ -7,10 +7,7 @@ use std::{io, usize};
 use std::io::Write;
 use std::path::PathBuf;
 use colored::Colorize;
-use sv_parser::{
-    ConstantExpression, Define, PortDeclaration,
-    PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node,
-};
+use sv_parser::{ConstantExpression, Define, PortDeclaration, PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node, Port};
 use crate::verilog::parameter::Param;
 use crate::verilog::width::Width;
 use crate::verilog::width::Width::RawWidth;
@@ -93,10 +90,13 @@ impl<'a> VerilogParser<'a> {
                     let mut module = VerilogModule::new(module_name);
 
                     // add parameter list
-                    module.add_param_list(self.extract_params(RefNode::from(module_node)));
+                    let params = self.extract_params(RefNode::from(module_node));
 
                     //add port
-                    module.add_ports(self.extract_ports(RefNode::from(module_node)));
+                    module.add_ports(self.extract_ports(RefNode::from(module_node), &params));
+
+                    // add parameter list
+                    module.add_param_list(params);
 
                     // TODO add inst
 
@@ -112,7 +112,15 @@ impl<'a> VerilogParser<'a> {
                             "".into()
                         });
                     let mut module = VerilogModule::new(module_name);
-                    module.add_ports(self.extract_ansi_ports(RefNode::from(module_node)));
+
+                    // add parameter list
+                    let params = self.extract_ansi_params(RefNode::from(module_node));
+
+                    // add ports
+                    module.add_ports(self.extract_ansi_ports(RefNode::from(module_node), &params));
+
+                    // add parameter list
+                    module.add_param_list(params);
 
                     // TODO add inst
 
@@ -125,11 +133,55 @@ impl<'a> VerilogParser<'a> {
         log::debug!("end extract module");
     }
 
-    fn extract_params(&self, module_node: RefNode) -> Vec<Param> {
-        todo!()
+    fn extract_ansi_params(&self, module_node: RefNode) -> Vec<Param> {
+        log::debug!("start extract ansi parameters");
+        let mut params = Vec::new();
+
+        for para_node in unwrap_node!(module_node, ParameterPortListDeclaration)
+            .into_iter()
+            .flatten()
+        {
+            if let RefNode::ParameterDeclaration(para) = para_node {
+                let token = if let Some(id) = unwrap_node!(para, ParameterIdentifier) {
+                    self.get_identifier_string(id)
+                } else { None };
+                let value = if let Some(t) = unwrap_node!(para, ConstantExpression) {
+                    self.get_literal_string(t)
+                } else { None };
+                if token.is_some() && value.is_some() {
+                    log::debug!("Find parameter token is {:?}, value is {:?}", token, value);
+                    params.push(Param::new(token.unwrap(), value.unwrap().width()));
+                } else {
+                    log::debug!("Error find parameter token is {:?}, value is {:?}", token, value);
+                }
+            }
+        }
+        params
     }
 
-    fn extract_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
+    fn extract_params(&self, node: RefNode) -> Vec<Param> {
+        log::debug!("start extract non-ansi params");
+        let mut params = Vec::new();
+        for item in node.into_iter() {
+            if let RefNode::ParameterDeclaration(para) = item {
+                let token = if let Some(id) = unwrap_node!(para, ParameterIdentifier) {
+                    self.get_identifier_string(id)
+                } else { None };
+                let value = if let Some(t) = unwrap_node!(para, ConstantExpression) {
+                    self.get_literal_string(t)
+                } else { None };
+                if token.is_some() && value.is_some() {
+                    log::debug!("Find parameter token is {:?}, value is {:?}", token, value);
+                    params.push(Param::new(token.unwrap(), value.unwrap().width()));
+                } else {
+                    log::debug!("Error find parameter token is {:?}, value is {:?}", token, value);
+                }
+            }
+        }
+        params
+    }
+
+    fn extract_ports(&self, module_node: RefNode, params: &Vec<Param>) -> Vec<VerilogPort> {
         log::debug!("start non-ansi extract ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter() {
@@ -139,6 +191,7 @@ impl<'a> VerilogParser<'a> {
 
                 //port width
                 let width = self.get_port_width(RefNode::from(port_dir));
+                let width = width.width_from(params);
 
                 // port name
                 for port_node in unwrap_node!(port_dir, ListOfPortIdentifiers)
@@ -162,7 +215,7 @@ impl<'a> VerilogParser<'a> {
         port_list
     }
 
-    fn extract_ansi_ports(&self, module_node: RefNode) -> Vec<VerilogPort> {
+    fn extract_ansi_ports(&self, module_node: RefNode, params: &Vec<Param>) -> Vec<VerilogPort> {
         log::debug!("start extract ansi ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter() {
@@ -177,6 +230,7 @@ impl<'a> VerilogParser<'a> {
                 };
 
                 let width = self.get_port_width(RefNode::from(port_dir));
+                let width = width.width_from(params);
 
                 let port_name = if let Some(id) = unwrap_node!(port_dir, PortIdentifier) {
                     self.get_identifier_string(id).unwrap_or_else(|| {
@@ -373,7 +427,8 @@ mod test {
     #[test]
     fn test_base() {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
-        let module_info = VerilogParser::new(&PathBuf::from("./test/npu_afifo_r.sv"))
+        // let module_info = VerilogParser::new(&PathBuf::from("./test/npu_afifo_r.sv"))
+        let module_info = VerilogParser::new(&PathBuf::from("./test/std-7.1.6-primitives.v"))
             .parse()
             .solve()
             .get_module_info();

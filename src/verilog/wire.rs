@@ -334,7 +334,7 @@ impl Borrow<str> for VerilogWire {
     }
 }
 
-struct WirePrinter {
+pub struct WirePrinter {
     name: String,
     width: usize
 }

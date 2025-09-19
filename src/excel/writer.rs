@@ -176,7 +176,7 @@ impl ExcelWriter {
 
         // 遍历wire builder 将所有没有驱动/没有load的信号连接到端口
         for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
-            let mut new_port = VerilogPort::new(inout, &name, width);
+            let mut new_port = VerilogPort::new(inout, &name, width.into());
             new_port.register_port_as_wire();
             module.add_port_inst(new_port);
         }
@@ -263,7 +263,7 @@ impl ExcelWriter {
         for (idx, port) in module.port_list.iter().enumerate() {
             sheet.write((idx + 2) as RowNum, 0, &port.name).unwrap();
             sheet.write((idx + 2) as RowNum, 1, format!("{}", port.inout)).unwrap();
-            sheet.write_with_format((idx + 2) as RowNum, 2, port.width as u32, &number_format).unwrap();
+            sheet.write_with_format((idx + 2) as RowNum, 2, port.width.width() as u32, &number_format).unwrap();
             let signal_string = port.get_signal_string()
                 .replace('{', "")
                 .replace('}', "");

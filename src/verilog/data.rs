@@ -1,5 +1,6 @@
 use strum::Display;
 use crate::verilog::module::VerilogModule;
+use crate::verilog::port::VerilogPort;
 
 ///
 /// type T may be VerilogModule, VerilogPort, VerilogWire
@@ -44,8 +45,9 @@ impl Data<VerilogPort> {
                 x.to_inst_string(is_last)
             }
             Data::Macro {name, value} => {
+                let mut res = Vec::new();
                 res.push(format!("`ifdef {}", name));
-                res.extend(value.to_inst_string());
+                res.extend(value.to_inst_string(is_last));
                 res.push(format!("`endif  // {}", name));
                 res
             }
@@ -53,9 +55,9 @@ impl Data<VerilogPort> {
     }
 }
 
-impl Data<Vec<VerilogPort>> {
-    pub fn to_inst_string
-}
+// impl Data<Vec<VerilogPort>> {
+//     pub fn to_inst_string
+// }
 
 
 #[cfg(test)]
