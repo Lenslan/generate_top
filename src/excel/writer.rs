@@ -107,8 +107,7 @@ impl ExcelWriter {
                     new_port.check_health();
                     inst_module.add_port_inst(new_port);
                 }
-                // TODO how to update literal width
-                // use function `update_literal_port_width`
+
                 module.add_inst_module(Arc::new(RefCell::new(inst_module)));
             } else {
                 log::info!("Inst {} in excel was not found in rtl, delete it", inst_excel.module_name);

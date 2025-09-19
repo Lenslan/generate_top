@@ -53,8 +53,10 @@ impl ExcelReader {
         let mut module = VerilogModule::new(sheets[0].clone());
         // extract module ports
         if let Ok(range) = workbook.worksheet_range(module_name) {
-            let (port_list, inst_name) = Self::extract_port(&range, true);
+            log::debug!("Extracting sheet {}", module_name);
+            let (port_list, inst_name, params) = Self::extract_port(&range, true);
             module.add_ports(port_list);
+            module.add_param_list(params);
             if let Some(s) = inst_name {
                 module.fix_inst_name(s);
             }
@@ -66,8 +68,9 @@ impl ExcelReader {
             log::debug!("Extracting sheet {}", inst_name);
             let mut inst_module = VerilogModule::new(String::from(inst_name));
             if let Ok(range) = workbook.worksheet_range(inst_name) {
-                let (port_list, inst_name) = Self::extract_port(&range, false);
+                let (port_list, inst_name, params) = Self::extract_port(&range, false);
                 inst_module.add_ports(port_list);
+                inst_module.add_param_list(params);
                 if let Some(s) = inst_name {
                     inst_module.fix_inst_name(s);
                 }
@@ -153,7 +156,7 @@ impl ExcelReader {
 
     /// extract message from one sheet
     /// return Portlist & inst_name
-    fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogPort>, Option<&String>) {
+    fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogPort>, Option<&String>, Vec<Param>) {
         let mut port_list = Vec::new();
         let mut inst_name = None;
         let mut params = Vec::new();
@@ -174,6 +177,7 @@ impl ExcelReader {
                     } else { 
                         let token = Self::extract_string(row_data.get(1));
                         let value = Self::extract_width(row_data.get(2));
+                        log::debug!("extract excel parameter token is :{:?}, value is {:?}", token, value);
                         params.push(Param::new(token.unwrap(), value));
                     }
                     continue;
@@ -196,7 +200,7 @@ impl ExcelReader {
                 port_list.push(new_port);
             }
         }
-        (port_list, inst_name)
+        (port_list, inst_name, params)
     }
 
 }
@@ -229,9 +233,9 @@ mod test {
     fn test_excel() {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let file = ExcelReader::new("src/excel/test/uart.xlsx".into());
-        file.generate_v();
-        // let module = file.get_excel_info();
+        // file.generate_v();
+        let module = file.get_excel_info();
         // WireBuilder::builder_show();
-        // println!("{:#?}", module);
+        println!("{:#?}", module);
     }
 }
