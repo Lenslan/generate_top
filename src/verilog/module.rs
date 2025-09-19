@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
+use crate::verilog::data::{VerilogData, WrapMacro};
 use crate::verilog::parameter::Param;
 use crate::verilog::VerilogBase;
 
@@ -13,8 +14,8 @@ pub struct VerilogModule {
     pub module_name: String,
     pub inst_name: Option<String>,
     pub param_list: Vec<Param>,
-    pub port_list: Vec<VerilogPort>,
-    pub inst_list: Vec<Arc<RefCell<VerilogModule>>>,
+    pub port_list: Vec<VerilogData<VerilogPort>>,
+    pub inst_list: Vec<Arc<RefCell<VerilogData<VerilogModule>>>>,
 }
 impl VerilogModule {
     pub fn new(module_name: String) -> Self {
@@ -29,18 +30,20 @@ impl VerilogModule {
     ///
     pub fn add_port(&mut self, inout: PortDir, name: &str, width: usize) {
         self.port_list
-            .push(VerilogPort::new(inout, name, width.into()))
+            .push(VerilogPort::new(inout, name, width.into()).wrap_raw())
     }
 
     pub fn add_port_inst(&mut self, port: VerilogPort) {
-        self.port_list.push(port);
+        self.port_list.push(port.wrap_raw());
     }
 
     pub fn add_ports(&mut self, ports: Vec<VerilogPort>) {
-        self.port_list.extend(ports);
+        for item in ports {
+            self.port_list.push(item.wrap_raw());
+        }
     }
 
-    pub fn add_inst_module(&mut self, module: Arc<RefCell<VerilogModule>>) {
+    pub fn add_inst_module(&mut self, module: Arc<RefCell<VerilogData<VerilogModule>>>) {
         self.inst_list.push(module);
     }
     
@@ -51,7 +54,7 @@ impl VerilogModule {
     ///
     /// According module name to find inst module
     /// 
-    pub fn find_inst_module_by_name(&self, name: &str) -> Option<Arc<RefCell<VerilogModule>>> {
+    pub fn find_inst_module_by_name(&self, name: &str) -> Option<Arc<RefCell<VerilogData<VerilogModule>>>> {
         for item in self.inst_list.iter() {
             if item.borrow().module_name == name {
                 return Some(Arc::clone(item));

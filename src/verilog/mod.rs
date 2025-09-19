@@ -3,9 +3,9 @@ pub mod parse;
 pub mod port;
 pub mod wire;
 mod writer;
-mod data;
+pub mod data;
 pub mod parameter;
-mod width;
+pub mod width;
 
 trait VerilogBase {
     fn get_name(&self) -> String;

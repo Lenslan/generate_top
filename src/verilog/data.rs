@@ -1,3 +1,5 @@
+use std::ops::Deref;
+use rust_xlsxwriter::ChartAxisLabelAlignment;
 use strum::Display;
 use crate::verilog::module::VerilogModule;
 use crate::verilog::port::VerilogPort;
@@ -5,15 +7,15 @@ use crate::verilog::port::VerilogPort;
 ///
 /// type T may be VerilogModule, VerilogPort, VerilogWire
 #[derive(Debug, Display)]
-enum Data<T> {
+pub enum VerilogData<T> {
     Raw(T),
     Macro {
         name: String,
-        value: Box<Data<T>>,
+        value: Box<VerilogData<T>>,
     }
 }
 
-impl<T> Data<T> {
+impl<T> VerilogData<T> {
     fn get_raw(&self) -> &T {
         match self {
             Self::Raw(x) => x,
@@ -22,11 +24,11 @@ impl<T> Data<T> {
     }
 }
 
-impl Data<VerilogModule> {
+impl VerilogData<VerilogModule> {
     pub fn to_inst_string(&self) -> Vec<String> {
         match self {
-            Data::Raw(x) => {x.to_inst_string()}
-            Data::Macro { name, value} => {
+            VerilogData::Raw(x) => {x.to_inst_string()}
+            VerilogData::Macro { name, value} => {
                 let mut res = Vec::new();
                 res.push(format!("`ifdef {}", name));
                 res.extend(value.to_inst_string());
@@ -37,14 +39,14 @@ impl Data<VerilogModule> {
     }
 }
 
-impl Data<VerilogPort> {
+impl VerilogData<VerilogPort> {
     
     pub fn to_inst_string(&self, is_last: bool) -> Vec<String> {
         match self {
-            Data::Raw(x) => {
+            VerilogData::Raw(x) => {
                 x.to_inst_string(is_last)
             }
-            Data::Macro {name, value} => {
+            VerilogData::Macro {name, value} => {
                 let mut res = Vec::new();
                 res.push(format!("`ifdef {}", name));
                 res.extend(value.to_inst_string(is_last));
@@ -55,14 +57,62 @@ impl Data<VerilogPort> {
     }
 }
 
-// impl Data<Vec<VerilogPort>> {
-//     pub fn to_inst_string
-// }
+impl VerilogData<Vec<VerilogPort>> {
+    pub fn to_inst_string(&self, is_last: bool) -> Vec<String> {
+        match self {
+            VerilogData::Raw(x) => {
+                let mut res = Vec::new();
+                if let Some((last_para, paras)) = x.split_last() {
+                    for item in paras {
+                        res.extend(item.to_inst_string(false));
+                    }
+                    res.extend(last_para.to_inst_string(is_last));
+                }
+                res
+            }
+            VerilogData::Macro {name, value} => {
+                let mut res = Vec::new();
+                res.push(format!("`ifdef {}", name));
+                res.extend(value.to_inst_string(is_last));
+                res.push(format!("`endif  // {}", name));
+                res
+            }
+        }
+    }
+}
+
+impl<T> Deref for VerilogData<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            VerilogData::Raw(x) => {x}
+            VerilogData::Macro { value, .. } => {value.deref()}
+        }
+    }
+}
+
+pub trait WrapMacro<T> {
+    fn wrap_macro(self, name: impl Into<String>) -> VerilogData<T>;
+    fn wrap_raw(self) -> VerilogData<T>;
+}
+impl<T> WrapMacro<T> for T {
+    fn wrap_macro(self, name: impl Into<String>) -> VerilogData<T> {
+        VerilogData::Macro {
+            name: name.into(),
+            value: Box::new(VerilogData::Raw(self))
+        }
+    }
+
+    fn wrap_raw(self) -> VerilogData<T> {
+        VerilogData::Raw(self)
+    }
+}
 
 
 #[cfg(test)]
 mod test {
-    use crate::verilog::data::Data::{Macro, Raw};
+    use crate::verilog::data::VerilogData::{Macro, Raw};
     use crate::verilog::module::VerilogModule;
 
     #[test]
