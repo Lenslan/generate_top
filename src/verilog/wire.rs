@@ -155,7 +155,7 @@ impl WireBuilder {
     /// must call this function after connected all the port
     ///
     pub fn check_health() {
-        log::info!("{}",">>> WireBuilder health check start >>>>".bright_green().bold());
+        log::info!("{}",">>> WireBuilder health check start <<<<".bright_green().bold());
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         for (wire, payload, error) in wire_builder.wires.values() {
             // Self::check_driver_load(&payload.driver, &payload.load, &wire.name);
@@ -171,7 +171,7 @@ impl WireBuilder {
                 log::error!("wire {}[{}] has multi-driver", wire.name.red().bold(), bit)
             }
         }
-        log::info!("{}","<<< WireBuilder health check end  <<<<".bright_green().bold());
+        log::info!("{}","<<< WireBuilder health check end  >>>>".bright_green().bold());
     }
 
     ///

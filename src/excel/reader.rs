@@ -6,6 +6,7 @@ use std::sync::Arc;
 use calamine::{Data, Range, Reader};
 use regex::Regex;
 use crate::verilog::module::VerilogModule;
+use crate::verilog::parameter::Param;
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 
@@ -155,6 +156,8 @@ impl ExcelReader {
     fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogPort>, Option<&String>) {
         let mut port_list = Vec::new();
         let mut inst_name = None;
+        let mut params = Vec::new();
+        let mut start_port_flag = false;
         for (row_idx, row_data) in  range.rows().enumerate() {
             if row_idx == 0 {
                 if let Some(Data::String(s)) = row_data.get(1) {
@@ -162,6 +165,19 @@ impl ExcelReader {
                 }
             }
             if row_idx > 1 {
+                if !start_port_flag {
+                    let temp = Self::extract_string(row_data.get(0));
+                    if let Some(s) = temp {
+                        if s.as_str() == "Port-name" {
+                            start_port_flag = true;
+                        }
+                    } else { 
+                        let token = Self::extract_string(row_data.get(1));
+                        let value = Self::extract_width(row_data.get(2));
+                        params.push(Param::new(token.unwrap(), value));
+                    }
+                    continue;
+                }
                 let port_name = Self::extract_string(row_data.get(0));
                 if port_name.is_none() { continue }
                 let inout = Self::extract_inout(row_data.get(1));

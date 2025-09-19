@@ -4,7 +4,7 @@ pub mod port;
 pub mod wire;
 mod writer;
 mod data;
-mod parameter;
+pub mod parameter;
 mod width;
 
 trait VerilogBase {

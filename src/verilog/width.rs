@@ -72,6 +72,13 @@ impl Width {
             Width::LiteralWidth(_, v) => *v
         }
     }
+
+    pub fn is_literal(&self) -> bool {
+        match self {
+            Width::RawWidth(_) => {false}
+            Width::LiteralWidth(_, _) => {true}
+        }
+    }
 }
 
 impl Add for Width {
