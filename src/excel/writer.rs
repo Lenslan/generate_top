@@ -135,13 +135,14 @@ impl ExcelWriter {
             module.add_port_inst(new_port);
         }
         log::info!("{}", "======>  Change Messages  <======".bright_purple().bold());
-        for p in temp_module.diff_ports_with(&module_xlsx) {
-            log::debug!("add port in rtl but not in xlsx: {}", p.name);
-            log::info!("add port {} by verilog source file", p.name);
-            let mut new_port = VerilogPort::copy_main_port_from(p);
-            new_port.register_port_as_wire();
-            module.add_port_inst(new_port);
-        }
+        // 存在bug，先不采用这种方式
+        // for p in temp_module.diff_ports_with(&module_xlsx) {
+        //     log::debug!("add port in rtl but not in xlsx: {}", p.name);
+        //     log::info!("add port {} by verilog source file", p.name);
+        //     let mut new_port = VerilogPort::copy_main_port_from(p);
+        //     new_port.register_port_as_wire();
+        //     module.add_port_inst(new_port);
+        // }
         for p in module_xlsx.diff_ports_with(&temp_module) {
             if WireBuilder::find_wire_in(p) {
                 log::debug!("add wire in xlsx but not in rtl: {}", p.name);
@@ -154,6 +155,15 @@ impl ExcelWriter {
                 log::info!("{} {}","drop port".bright_black(), p.name.bright_black());
             }
         }
+
+        for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
+            log::debug!("add port in rtl but not in xlsx: {}", name);
+            log::info!("add port {} by verilog source file", name);
+            let mut new_port = VerilogPort::new(inout, &name, width.into());
+            new_port.register_port_as_wire();
+            module.add_port_inst(new_port);
+        }
+
         log::info!("{}", "<======  Change Messages  ======>".bright_purple().bold());
 
         WireBuilder::check_health();
@@ -172,6 +182,9 @@ impl ExcelWriter {
         workbook.save(excel_name).unwrap();
     }
 
+    ///
+    /// get VerilogModule from verilog source file
+    ///
     fn get_module_from_v(&self, module_name: &str) -> VerilogModule {
         UndefineWireCollector::clear();
         WireBuilder::clear();
@@ -286,7 +299,7 @@ impl ExcelWriter {
             sheet.write_with_format(current_line, item.0 as ColNum, item.1, &header_format).unwrap();
             sheet.set_column_width(item.0 as ColNum, width_list[item.0]).unwrap();
         }
-        sheet.set_freeze_panes(current_line, 0).unwrap();
+        sheet.set_freeze_panes(current_line+1, 0).unwrap();
         current_line += 1;
 
         // write port
