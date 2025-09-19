@@ -8,6 +8,7 @@ use std::sync::{LazyLock, Mutex};
 use std::{sync::Arc, vec};
 use std::hash::{Hash, Hasher};
 use strum::Display;
+use crate::verilog::parameter::Param;
 use crate::verilog::VerilogBase;
 use crate::verilog::width::Width;
 
@@ -268,6 +269,12 @@ impl VerilogPort {
         // dont check_health, since do this by function caller
         // new_port.check_health();
         new_port
+    }
+    
+    pub fn update_literal_port_width(&mut self, params: &Vec<Param>) {
+        if self.width.is_literal() {
+            self.width = self.width.width_from(params)
+        }
     }
 
 

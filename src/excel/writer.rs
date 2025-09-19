@@ -81,9 +81,20 @@ impl ExcelWriter {
             let inst_excel = inst_excel.borrow();
             if let Some(inst_v) = module_v.find_inst_module_by_name(&inst_excel.module_name) {
                 log::debug!("add inst {} in excel", inst_excel.module_name);
+                let params = VerilogModule::copy_parameter_from(&inst_excel);
+                // update width
+                {
+                    let mut inst_v_mut = inst_v.borrow_mut();
+                    inst_v_mut.update_literal_port(&params);
+                }
+
+                // after
                 let inst_v = inst_v.borrow();
                 let mut inst_module = VerilogModule::new(inst_excel.module_name.clone());
                 inst_module.fix_inst_name(inst_excel.inst_name.as_deref().unwrap());
+
+
+                inst_module.add_param_list(params);
 
                 // traverse all the port of `inst_v`
                 for p in inst_excel.same_ports_with(&inst_v) {
@@ -96,6 +107,8 @@ impl ExcelWriter {
                     new_port.check_health();
                     inst_module.add_port_inst(new_port);
                 }
+                // TODO how to update literal width
+                // use function `update_literal_port_width`
                 module.add_inst_module(Arc::new(RefCell::new(inst_module)));
             } else {
                 log::info!("Inst {} in excel was not found in rtl, delete it", inst_excel.module_name);

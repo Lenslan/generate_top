@@ -104,6 +104,20 @@ impl VerilogModule {
         new_module
     }
 
+    pub fn copy_parameter_from(other: &VerilogModule) -> Vec<Param> {
+        let mut res = Vec::with_capacity(other.param_list.len());
+        for p in other.param_list.iter() {
+            res.push(p.clone());
+        }
+        res
+    }
+
+    pub fn update_literal_port(&mut self, params: &Vec<Param>) {
+        for p in self.port_list.iter_mut() {
+            p.update_literal_port_width(params)
+        }
+    }
+
     ///
     /// Compare with other VerilogModules
     /// to find inst module in self not in other
