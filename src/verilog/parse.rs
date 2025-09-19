@@ -1,13 +1,11 @@
-use crate::utils::calculator::StrCalc;
 use crate::verilog::module::VerilogModule;
 use crate::verilog::port::{PortDir, VerilogPort};
 use std::collections::HashMap;
 use std::fs::File;
-use std::{io, usize};
+use std::{usize};
 use std::io::Write;
 use std::path::PathBuf;
-use colored::Colorize;
-use sv_parser::{ConstantExpression, Define, PortDeclaration, PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node, Port};
+use sv_parser::{ConstantExpression, Define, PortDeclaration, PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node};
 use crate::verilog::parameter::Param;
 use crate::verilog::width::Width;
 use crate::verilog::width::Width::RawWidth;

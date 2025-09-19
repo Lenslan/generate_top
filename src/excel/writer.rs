@@ -239,7 +239,7 @@ impl ExcelWriter {
             .set_border_bottom(FormatBorder::Medium)
             .set_border_top(FormatBorder::Medium)
             .set_background_color(Color::Gray);
-        let inst_name_format = Format::new()
+        let bold_format = Format::new()
             .set_bold()
             .set_align(FormatAlign::Center);
         let number_format = Format::new()
@@ -249,34 +249,52 @@ impl ExcelWriter {
         let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-comment"];
         let width_list = [30, 10, 10, 30, 40];
 
+        let mut current_line = 0;
+
         sheet.set_name(&module.module_name).unwrap();
         sheet.set_row_height(0, 18).unwrap();
         sheet.set_row_height(1, 20).unwrap();
 
-        sheet.write_with_format(0, 0, "Module Inst Name", &inst_name_format).unwrap();
-        sheet.write(0, 1, format!("{}", module.inst_name.as_deref().unwrap_or_default())).unwrap();
+        // write Module Inst name
+        sheet.write_with_format(current_line, 0, "Module Inst Name", &bold_format).unwrap();
+        sheet.write(current_line, 1, format!("{}", module.inst_name.as_deref().unwrap_or_default())).unwrap();
+        current_line += 1;
 
+        // write parameter list
+        sheet.write_with_format(current_line, 0, "Parameter:", &bold_format).unwrap();
+        current_line += 1;
+        for (idx, para) in module.param_list.iter().enumerate() {
+            sheet.write(current_line, 1, para.name.as_str()).unwrap();
+            sheet.write(current_line, 2, para.value as u32).unwrap();
+            current_line += 1;
+        }
+
+        // write title
         for item in title_list.into_iter().enumerate() {
-            sheet.write_with_format(1, item.0 as ColNum, item.1, &header_format).unwrap();
+            sheet.write_with_format(current_line, item.0 as ColNum, item.1, &header_format).unwrap();
             sheet.set_column_width(item.0 as ColNum, width_list[item.0]).unwrap();
         }
+        sheet.set_freeze_panes(current_line, 0).unwrap();
+        current_line += 1;
+
+        // write port
         for (idx, port) in module.port_list.iter().enumerate() {
-            sheet.write((idx + 2) as RowNum, 0, &port.name).unwrap();
-            sheet.write((idx + 2) as RowNum, 1, format!("{}", port.inout)).unwrap();
-            sheet.write_with_format((idx + 2) as RowNum, 2, port.width.width() as u32, &number_format).unwrap();
+            sheet.write(current_line, 0, &port.name).unwrap();
+            sheet.write(current_line, 1, format!("{}", port.inout)).unwrap();
+            sheet.write_with_format(current_line, 2, port.width.width() as u32, &number_format).unwrap();
             let signal_string = port.get_signal_string()
                 .replace('{', "")
                 .replace('}', "");
             if Self::drop_bracket(&signal_string) == port.name && port.signals.len() == 2 {
-                sheet.write_with_format((idx + 2) as RowNum, 3, signal_string, &same_wire_port_format).unwrap();
+                sheet.write_with_format(current_line, 3, signal_string, &same_wire_port_format).unwrap();
             } else {
-                sheet.write((idx + 2) as RowNum, 3, signal_string).unwrap();
+                sheet.write(current_line, 3, signal_string).unwrap();
             }
-            sheet.write((idx + 2) as RowNum, 4, &port.info).unwrap();
-            sheet.set_row_height((idx + 2) as RowNum, 16).unwrap();
+            sheet.write(current_line, 4, &port.info).unwrap();
+            sheet.set_row_height(current_line, 16).unwrap();
+            current_line += 1;
         }
 
-        sheet.set_freeze_panes(2, 0).unwrap();
         sheet
     }
 
