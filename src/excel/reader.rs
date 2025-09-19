@@ -233,9 +233,9 @@ mod test {
     fn test_excel() {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let file = ExcelReader::new("src/excel/test/uart.xlsx".into());
-        // file.generate_v();
-        let module = file.get_excel_info();
+        file.generate_v();
+        // let module = file.get_excel_info();
         // WireBuilder::builder_show();
-        println!("{:#?}", module);
+        // println!("{:#?}", module);
     }
 }

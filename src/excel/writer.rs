@@ -4,11 +4,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use colored::Colorize;
 use regex::Regex;
-use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, FormatUnderline, RowNum, Workbook, Worksheet};
+use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, FormatUnderline, Workbook, Worksheet};
 use walkdir::WalkDir;
 use crate::verilog::module::VerilogModule;
 use crate::verilog::parse::VerilogParser;
-use crate::verilog::port::{UndefineWireCollector, VerilogPort, VerilogValue};
+use crate::verilog::port::{UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 
 #[derive(Default)]
@@ -275,7 +275,7 @@ impl ExcelWriter {
         // write parameter list
         sheet.write_with_format(current_line, 0, "Parameter:", &bold_format).unwrap();
         current_line += 1;
-        for (idx, para) in module.param_list.iter().enumerate() {
+        for (_idx, para) in module.param_list.iter().enumerate() {
             sheet.write(current_line, 1, para.name.as_str()).unwrap();
             sheet.write(current_line, 2, para.value as u32).unwrap();
             current_line += 1;
@@ -290,7 +290,7 @@ impl ExcelWriter {
         current_line += 1;
 
         // write port
-        for (idx, port) in module.port_list.iter().enumerate() {
+        for (_idx, port) in module.port_list.iter().enumerate() {
             sheet.write(current_line, 0, &port.name).unwrap();
             sheet.write(current_line, 1, format!("{}", port.inout)).unwrap();
             sheet.write_with_format(current_line, 2, port.width.width() as u32, &number_format).unwrap();

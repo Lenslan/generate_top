@@ -177,11 +177,21 @@ impl VerilogModule {
     ///
     pub fn to_inst_string(&self) -> Vec<String> {
         let mut res = Vec::new();
-        res.push(format!(
-            "{} {} (",
-            self.module_name,
-            self.inst_name.as_ref().unwrap()
-        ));
+
+        if let Some((last_para, params)) = self.param_list.split_last() {
+            res.push(format!("{} #(", self.module_name));
+            for p in params {
+                res.push(format!("    .{:<20}({:<10}),", p.name, p.value));
+            }
+            res.push(format!("    .{:<20}({:<10})", last_para.name, last_para.value));
+            res.push(format!(") {} (", self.inst_name.as_ref().unwrap()));
+        } else {
+            res.push(format!(
+                "{} {} (",
+                self.module_name,
+                self.inst_name.as_ref().unwrap()
+            ));
+        }
 
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports {
