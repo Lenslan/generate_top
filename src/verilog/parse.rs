@@ -6,6 +6,7 @@ use std::{usize};
 use std::io::Write;
 use std::path::PathBuf;
 use sv_parser::{ConstantExpression, Define, PortDeclaration, PortDirection, RefNode, SyntaxTree, parse_sv, unwrap_node};
+use crate::verilog::data::{VerilogData, WrapMacro};
 use crate::verilog::parameter::Param;
 use crate::verilog::width::Width;
 use crate::verilog::width::Width::RawWidth;
@@ -179,7 +180,7 @@ impl<'a> VerilogParser<'a> {
         params
     }
 
-    fn extract_ports(&self, module_node: RefNode, params: &Vec<Param>) -> Vec<VerilogPort> {
+    fn extract_ports(&self, module_node: RefNode, params: &Vec<Param>) -> Vec<VerilogData<VerilogPort>> {
         log::debug!("start non-ansi extract ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter() {
@@ -204,7 +205,7 @@ impl<'a> VerilogParser<'a> {
                                 "".into()
                             });
                         let port_inst = VerilogPort::new(inout.clone(), &port_name, width.clone());
-                        port_list.push(port_inst);
+                        port_list.push(port_inst.wrap_raw());
                     }
                 }
             }
@@ -213,7 +214,7 @@ impl<'a> VerilogParser<'a> {
         port_list
     }
 
-    fn extract_ansi_ports(&self, module_node: RefNode, params: &Vec<Param>) -> Vec<VerilogPort> {
+    fn extract_ansi_ports(&self, module_node: RefNode, params: &Vec<Param>) -> Vec<VerilogData<VerilogPort>> {
         log::debug!("start extract ansi ports");
         let mut port_list = Vec::new();
         for item in module_node.into_iter() {
@@ -242,7 +243,7 @@ impl<'a> VerilogParser<'a> {
                 log::debug!("extract port name is {}", port_name);
 
                 let port_inst = VerilogPort::new(inout, &port_name, width);
-                port_list.push(port_inst);
+                port_list.push(port_inst.wrap_raw());
             }
         }
         port_list

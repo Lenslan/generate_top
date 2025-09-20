@@ -6,6 +6,7 @@ use colored::Colorize;
 use regex::Regex;
 use rust_xlsxwriter::{ColNum, Color, Format, FormatAlign, FormatBorder, FormatUnderline, Workbook, Worksheet};
 use walkdir::WalkDir;
+use crate::verilog::data::{VerilogData, WrapMacro};
 use crate::verilog::module::VerilogModule;
 use crate::verilog::parse::VerilogParser;
 use crate::verilog::port::{UndefineWireCollector, VerilogPort};
@@ -88,7 +89,7 @@ impl ExcelWriter {
                     inst_v_mut.update_literal_port(&params);
                 }
 
-                // after
+                // update inst name
                 let inst_v = inst_v.borrow();
                 let mut inst_module = VerilogModule::new(inst_excel.module_name.clone());
                 inst_module.fix_inst_name(inst_excel.inst_name.as_deref().unwrap());
@@ -108,7 +109,7 @@ impl ExcelWriter {
                     inst_module.add_port_inst(new_port);
                 }
 
-                module.add_inst_module(Arc::new(RefCell::new(inst_module)));
+                module.add_inst_module(Arc::new(RefCell::new(inst_module.wrap_macro_as(&inst_excel))));
             } else {
                 log::info!("Inst {} in excel was not found in rtl, delete it", inst_excel.module_name);
                 continue;
@@ -132,7 +133,7 @@ impl ExcelWriter {
             log::debug!("add port in rtl & xlsx: {}", p.name);
             let mut new_port = VerilogPort::copy_main_port_from(p);
             new_port.register_port_as_wire();
-            module.add_port_inst(new_port);
+            module.add_port_inst(new_port.wrap_macro_as(p));
         }
         log::info!("{}", "======>  Change Messages  <======".bright_purple().bold());
         // 存在bug，先不采用这种方式
@@ -149,7 +150,7 @@ impl ExcelWriter {
                 log::info!("add port {} by excel file", p.name);
                 let mut new_port = VerilogPort::copy_main_port_from(p);
                 new_port.register_port_as_wire();
-                module.add_port_inst(new_port);
+                module.add_port_inst(new_port.wrap_macro_as(p));
             } else {
                 log::debug!("Port {} in xlsx but not in rtl was dropped", p.name);
                 log::info!("{} {}","drop port".bright_black(), p.name.bright_black());
@@ -161,18 +162,18 @@ impl ExcelWriter {
             log::info!("add port {} by verilog source file", name);
             let mut new_port = VerilogPort::new(inout, &name, width.into());
             new_port.register_port_as_wire();
-            module.add_port_inst(new_port);
+            module.add_port_inst(new_port.wrap_raw());
         }
 
         log::info!("{}", "<======  Change Messages  ======>".bright_purple().bold());
 
         WireBuilder::check_health();
 
-        self.write_excel(excel_name, module);
+        self.write_excel(excel_name, module.wrap_raw());
 
     }
 
-    fn write_excel(&self, excel_name: PathBuf, module: VerilogModule) {
+    fn write_excel(&self, excel_name: PathBuf, module: VerilogData<VerilogModule>) {
         let mut workbook = Workbook::new();
 
         workbook.push_worksheet(self.add_inst_sheet(&module));
@@ -185,7 +186,7 @@ impl ExcelWriter {
     ///
     /// get VerilogModule from verilog source file
     ///
-    fn get_module_from_v(&self, module_name: &str) -> VerilogModule {
+    fn get_module_from_v(&self, module_name: &str) -> VerilogData<VerilogModule> {
         UndefineWireCollector::clear();
         WireBuilder::clear();
         let mut module = VerilogModule::new(module_name.into());
@@ -195,7 +196,7 @@ impl ExcelWriter {
             for mut inst_item in inst_module {
                 inst_item.set_default_inst_name();
                 inst_item.set_default_port_wires();
-                module.add_inst_module(Arc::new(RefCell::new(inst_item)));
+                module.add_inst_module(Arc::new(RefCell::new(inst_item.wrap_raw())));
             }
         }
 
@@ -203,10 +204,10 @@ impl ExcelWriter {
         for (inout, width, name) in WireBuilder::traverse_unload_undriven() {
             let mut new_port = VerilogPort::new(inout, &name, width.into());
             new_port.register_port_as_wire();
-            module.add_port_inst(new_port);
+            module.add_port_inst(new_port.wrap_raw());
         }
 
-        module
+        module.wrap_raw()
     }
 
     fn get_module_from_excel(&self, path: &PathBuf) -> VerilogModule {
@@ -255,7 +256,8 @@ impl ExcelWriter {
         }
     }
 
-    fn add_inst_sheet(&self, module: &VerilogModule) -> Worksheet {
+    fn add_inst_sheet(&self, module: &VerilogData<VerilogModule>) -> Worksheet {
+        let macro_string = module.get_macro_name();
         let mut sheet = Worksheet::new();
         let header_format = Format::new()
             .set_bold()
@@ -271,8 +273,8 @@ impl ExcelWriter {
             .set_align(FormatAlign::Left);
         let same_wire_port_format = Format::new()
             .set_underline(FormatUnderline::Single);
-        let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-comment"];
-        let width_list = [30, 10, 10, 30, 40];
+        let title_list = ["Port-name", "InOut", "Width", "Wire-name", "Port-comment", macro_string.as_str()];
+        let width_list = [30, 10, 10, 30, 40, 20];
 
         let mut current_line = 0;
 
@@ -294,7 +296,7 @@ impl ExcelWriter {
             current_line += 1;
         }
 
-        // write title
+        // write Title
         for item in title_list.into_iter().enumerate() {
             sheet.write_with_format(current_line, item.0 as ColNum, item.1, &header_format).unwrap();
             sheet.set_column_width(item.0 as ColNum, width_list[item.0]).unwrap();
@@ -317,6 +319,10 @@ impl ExcelWriter {
             }
             sheet.write(current_line, 4, &port.info).unwrap();
             sheet.set_row_height(current_line, 16).unwrap();
+            
+            // write macro tag
+            sheet.write(current_line, 5, port.get_signal_string()).unwrap();
+            
             current_line += 1;
         }
 

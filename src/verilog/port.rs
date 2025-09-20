@@ -8,6 +8,7 @@ use std::sync::{LazyLock, Mutex};
 use std::{sync::Arc, vec};
 use std::hash::{Hash, Hasher};
 use strum::Display;
+use crate::verilog::data::{VerilogData, WrapMacro};
 use crate::verilog::parameter::Param;
 use crate::verilog::VerilogBase;
 use crate::verilog::width::Width;
@@ -223,7 +224,7 @@ impl VerilogPort {
         };
     }
 
-    pub fn copy_inst_port_from(p: &VerilogPort) -> Self {
+    pub fn copy_inst_port_from(p: &VerilogData<VerilogPort>) -> VerilogData<Self> {
         let mut new_port = VerilogPort::new(p.inout, &p.name, p.width.clone());
         if p.info.len() > 0 {
             new_port.set_info_msg(&p.info)
@@ -244,7 +245,7 @@ impl VerilogPort {
         }
         // dont check_health, since do this by function caller
         // new_port.check_health();
-        new_port
+        new_port.wrap_macro_as(p)
     }
 
     pub fn copy_main_port_from(p: &VerilogPort) -> Self {

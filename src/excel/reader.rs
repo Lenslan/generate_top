@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use calamine::{Data, Range, Reader};
 use regex::Regex;
+use crate::verilog::data::{VerilogData, WrapMacro};
 use crate::verilog::module::VerilogModule;
 use crate::verilog::parameter::Param;
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
@@ -54,7 +55,7 @@ impl ExcelReader {
         // extract module ports
         if let Ok(range) = workbook.worksheet_range(module_name) {
             log::debug!("Extracting sheet {}", module_name);
-            let (port_list, inst_name, params) = Self::extract_port(&range, true);
+            let (port_list, inst_name, params, _) = Self::extract_port(&range, true);
             module.add_ports(port_list);
             module.add_param_list(params);
             if let Some(s) = inst_name {
@@ -68,14 +69,14 @@ impl ExcelReader {
             log::debug!("Extracting sheet {}", inst_name);
             let mut inst_module = VerilogModule::new(String::from(inst_name));
             if let Ok(range) = workbook.worksheet_range(inst_name) {
-                let (port_list, inst_name, params) = Self::extract_port(&range, false);
+                let (port_list, inst_name, params, macro_string) = Self::extract_port(&range, false);
                 inst_module.add_ports(port_list);
                 inst_module.add_param_list(params);
                 if let Some(s) = inst_name {
                     inst_module.fix_inst_name(s);
                 }
                 inst_module.port_list.iter_mut().for_each(|p| p.check_health());
-                module.add_inst_module(Arc::new(RefCell::new(inst_module)));
+                module.add_inst_module(Arc::new(RefCell::new(inst_module.wrap_macro_with(macro_string))));
             }
         }
         
@@ -156,11 +157,12 @@ impl ExcelReader {
 
     /// extract message from one sheet
     /// return Portlist & inst_name
-    fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogPort>, Option<&String>, Vec<Param>) {
+    fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogData<VerilogPort>>, Option<&String>, Vec<Param>, Vec<String>) {
         let mut port_list = Vec::new();
         let mut inst_name = None;
         let mut params = Vec::new();
         let mut start_port_flag = false;
+        let mut macro_string = Vec::new();
         for (row_idx, row_data) in  range.rows().enumerate() {
             if row_idx == 0 {
                 if let Some(Data::String(s)) = row_data.get(1) {
@@ -173,6 +175,7 @@ impl ExcelReader {
                     if let Some(s) = temp {
                         if s.as_str() == "Port-name" {
                             start_port_flag = true;
+                            macro_string = Self::extract_wires(row_data.get(5));
                         }
                     } else { 
                         let token = Self::extract_string(row_data.get(1));
@@ -188,6 +191,7 @@ impl ExcelReader {
                 let width = Self::extract_width(row_data.get(2));
                 let wire_name = Self::extract_wires(row_data.get(3));
                 let port_info = Self::extract_string(row_data.get(4));
+                let macro_tags = Self::extract_wires(row_data.get(5));
 
                 let mut new_port = VerilogPort::new(inout, &port_name.unwrap(), width.into());
                 if let Some(s) = port_info {
@@ -196,11 +200,11 @@ impl ExcelReader {
                 Self::match_wires_by_re(&mut new_port, wire_name, flag);
                 // Dont exec check_health() function, used by the function caller
                 // new_port.check_health();
-
-                port_list.push(new_port);
+                
+                port_list.push(new_port.wrap_macro_with(macro_tags));
             }
         }
-        (port_list, inst_name, params)
+        (port_list, inst_name, params, macro_string)
     }
 
 }

@@ -33,13 +33,13 @@ impl VerilogModule {
             .push(VerilogPort::new(inout, name, width.into()).wrap_raw())
     }
 
-    pub fn add_port_inst(&mut self, port: VerilogPort) {
-        self.port_list.push(port.wrap_raw());
+    pub fn add_port_inst(&mut self, port: VerilogData<VerilogPort>) {
+        self.port_list.push(port);
     }
 
-    pub fn add_ports(&mut self, ports: Vec<VerilogPort>) {
+    pub fn add_ports(&mut self, ports: Vec<VerilogData<VerilogPort>>) {
         for item in ports {
-            self.port_list.push(item.wrap_raw());
+            self.port_list.push(item);
         }
     }
 
@@ -97,14 +97,14 @@ impl VerilogModule {
     /// generate a module from other VerilogModule
     /// used to copy submodule
     ///
-    pub fn copy_module_from(other: &VerilogModule) -> VerilogModule{
+    pub fn copy_module_from(other: &VerilogData<VerilogModule>) -> VerilogData<VerilogModule>{
         let mut new_module = VerilogModule::new(other.module_name.clone());
         for p in other.port_list.iter() {
             let mut new_port = VerilogPort::copy_inst_port_from(p);
             new_port.check_health();
             new_module.add_port_inst(new_port);
         }
-        new_module
+        new_module.wrap_macro_as(other)
     }
 
     pub fn copy_parameter_from(other: &VerilogModule) -> Vec<Param> {
@@ -125,7 +125,7 @@ impl VerilogModule {
     /// Compare with other VerilogModules
     /// to find inst module in self not in other
     ///
-    pub fn diff_inst_with(&self, other:&VerilogModule) -> Vec<Arc<RefCell<VerilogModule>>> {
+    pub fn diff_inst_with(&self, other:&VerilogModule) -> Vec<Arc<RefCell<VerilogData<VerilogModule>>>> {
         let ids: HashSet<_> = other.inst_list
             .iter()
             .map(|x| x.borrow().module_name.clone())
@@ -141,7 +141,7 @@ impl VerilogModule {
     /// Compared with other VerilogModules
     /// to find ports in self not in other
     ///
-    pub fn diff_ports_with(&self, other: &VerilogModule) -> Vec<&VerilogPort> {
+    pub fn diff_ports_with(&self, other: &VerilogModule) -> Vec<&VerilogData<VerilogPort>> {
         let other_ports: HashSet<_> = other.port_list.iter().collect();
         self.port_list.iter().filter(|item| {
             !other_ports.contains(item)
@@ -152,7 +152,7 @@ impl VerilogModule {
     /// Compared with other VerilogModules
     /// to find ports in self & other
     ///
-    pub fn same_ports_with(&self, other: &VerilogModule) -> Vec<&VerilogPort> {
+    pub fn same_ports_with(&self, other: &VerilogModule) -> Vec<&VerilogData<VerilogPort>> {
         let other_ports: HashSet<_> = other.port_list.iter().collect();
         self.port_list.iter().filter(|item| {
             other_ports.contains(item)
@@ -271,6 +271,7 @@ impl VerilogBase for VerilogModule {
 
 #[cfg(test)]
 mod test {
+    use crate::verilog::data::WrapMacro;
     use crate::verilog::module::VerilogModule;
     use crate::verilog::port::{PortDir, VerilogPort};
 
@@ -293,7 +294,7 @@ mod test {
             12.into(),
         );
         port3.connect_number_signal(43, 8);
-        module.add_ports(vec![port1, port2, port3]);
+        module.add_ports(vec![port1.wrap_raw(), port2.wrap_raw(), port3.wrap_raw()]);
         println!("{}", module.to_inst_string().join("\n"));
     }
 }
