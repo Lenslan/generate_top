@@ -104,7 +104,7 @@ impl ExcelWriter {
                     inst_module.add_port_inst(new_port);
                 }
                 for p in inst_v.diff_ports_with(&inst_excel) {
-                    let mut new_port = VerilogPort::copy_inst_port_from(p);
+                    let mut new_port = VerilogPort::copy_inst_port_without_wire_from(p);
                     new_port.check_health();
                     inst_module.add_port_inst(new_port);
                 }
@@ -308,7 +308,8 @@ impl ExcelWriter {
         for (_idx, port) in module.port_list.iter().enumerate() {
             sheet.write(current_line, 0, &port.name).unwrap();
             sheet.write(current_line, 1, format!("{}", port.inout)).unwrap();
-            sheet.write_with_format(current_line, 2, port.width.width() as u32, &number_format).unwrap();
+            // sheet.write_with_format(current_line, 2, port.width.width() as u32, &number_format).unwrap();
+            sheet.write(current_line, 2, port.width.width() as u32).unwrap();
             let signal_string = port.get_signal_string()
                 .replace('{', "")
                 .replace('}', "");

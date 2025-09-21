@@ -223,7 +223,11 @@ impl VerilogPort {
             }
         };
     }
-
+    
+    ///
+    /// copy a port
+    /// reconnect wires to new port
+    /// 
     pub fn copy_inst_port_from(p: &VerilogData<VerilogPort>) -> VerilogData<Self> {
         let mut new_port = VerilogPort::new(p.inout, &p.name, p.width.clone());
         if p.info.len() > 0 {
@@ -243,6 +247,20 @@ impl VerilogPort {
                 VerilogValue::NONE => {}
             }
         }
+        // dont check_health, since do this by function caller
+        // new_port.check_health();
+        new_port.wrap_macro_as(p)
+    }
+    
+    ///
+    /// copy a port
+    /// connect wires to self port
+    /// without msg info
+    /// 
+    pub fn copy_inst_port_without_wire_from(p: &VerilogData<VerilogPort>) -> VerilogData<Self> {
+        let mut new_port = VerilogPort::new(p.inout, &p.name, p.width.clone());
+        new_port.connect_self();
+        
         // dont check_health, since do this by function caller
         // new_port.check_health();
         new_port.wrap_macro_as(p)
