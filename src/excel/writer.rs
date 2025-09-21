@@ -321,7 +321,7 @@ impl ExcelWriter {
             sheet.set_row_height(current_line, 16).unwrap();
             
             // write macro tag
-            sheet.write(current_line, 5, port.get_signal_string()).unwrap();
+            sheet.write(current_line, 5, port.get_macro_name()).unwrap();
             
             current_line += 1;
         }

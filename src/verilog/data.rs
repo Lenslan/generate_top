@@ -34,6 +34,7 @@ impl<T> VerilogData<T> {
                 res.push(value.get_macro_name())
             }
         }
+        res.retain(|x| !x.is_empty());
         res.join(", ")
     }
 }
