@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::fmt::format;
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 use std::sync::Arc;
@@ -218,10 +219,10 @@ impl VerilogModule {
         // port info
         if let Some((last_port, ports)) = self.port_list.split_last() {
             for port in ports.iter() {
-                res.extend(port.to_port_string(false));
+                res.extend(port.to_port_string(false).into_iter().map(|s| format!("{}{}", " ".repeat(indent), s)));
             }
             
-            res.extend(last_port.to_port_string(true));
+            res.extend(last_port.to_port_string(true).into_iter().map(|s| format!("{}{}", " ".repeat(indent), s)));
 
             res.push(");\n".to_string());
         }
@@ -242,6 +243,7 @@ impl VerilogModule {
                 item.to_assign_string()
             })
             .flatten()
+            .map(|x| format!("{}{}", " ".repeat(indent), x))
             .collect::<Vec<_>>();
         res.extend(temp);
         res.push("\n".to_string());

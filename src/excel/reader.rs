@@ -155,6 +155,22 @@ impl ExcelReader {
         }
     }
 
+    fn check_name_char(name: &str) {
+        let name_re = Regex::new(r"^\b[a-zA-Z_]\w*\b$").unwrap();
+        if !name_re.is_match(name) {
+            panic!("illegal name `{}`!!", name);
+        }
+    }
+
+    fn check_name_chars(name: &Vec<String>) {
+        let name_re = Regex::new(r"^\b[a-zA-Z_]\w*\b$").unwrap();
+        for s in name {
+            if !name_re.is_match(s) {
+                panic!("illegal name `{}`!!", s);
+            }
+        }
+    }
+
     /// extract message from one sheet
     /// return Portlist & inst_name
     fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogData<VerilogPort>>, Option<&String>, Vec<Param>, Vec<String>) {
@@ -176,9 +192,11 @@ impl ExcelReader {
                         if s.as_str() == "Port-name" {
                             start_port_flag = true;
                             macro_string = Self::extract_wires(row_data.get(5));
+                            Self::check_name_chars(&macro_string);
                         }
                     } else { 
                         let token = Self::extract_string(row_data.get(1));
+                        Self::check_name_char(token.as_ref().unwrap());
                         let value = Self::extract_width(row_data.get(2));
                         log::debug!("extract excel parameter token is :{:?}, value is {:?}", token, value);
                         params.push(Param::new(token.unwrap(), value));
@@ -187,11 +205,13 @@ impl ExcelReader {
                 }
                 let port_name = Self::extract_string(row_data.get(0));
                 if port_name.is_none() { continue }
+                Self::check_name_char(port_name.as_ref().unwrap());
                 let inout = Self::extract_inout(row_data.get(1));
                 let width = Self::extract_width(row_data.get(2));
                 let wire_name = Self::extract_wires(row_data.get(3));
                 let port_info = Self::extract_string(row_data.get(4));
                 let macro_tags = Self::extract_wires(row_data.get(5));
+                Self::check_name_chars(&macro_string);
 
                 let mut new_port = VerilogPort::new(inout, &port_name.unwrap(), width.into());
                 if let Some(s) = port_info {

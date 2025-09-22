@@ -30,7 +30,7 @@ fn main() {
 }
 
 #[derive(Parser, Debug)]
-#[command(version = "1.0")]
+#[command(version = "2.0")]
 #[command(about = "used to generate verilog top module")]
 struct Args {
     #[command(subcommand)]
