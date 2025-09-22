@@ -126,7 +126,7 @@ impl ExcelReader {
     fn extract_wires(data: Option<&Data>) -> Vec<String> {
         match data {
             Some(Data::String(s)) => {
-                s.split(|c| c == ',' || c == ' ')
+                s.split(|c| c == ',' || c == ' ' || c == '\n')
                     .filter_map(|x| if x.is_empty() {None} else {Some(String::from(x))})
                     .collect()
             },
