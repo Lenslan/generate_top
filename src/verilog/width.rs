@@ -51,7 +51,7 @@ impl Width {
                 for p in param {
                     temp = temp.replace(
                         &p.name,
-                        &format!("{}", p.value),
+                        &format!("{}", p.get_value()),
                     )
                 }
                 let res = temp.calculate();

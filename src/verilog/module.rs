@@ -185,9 +185,9 @@ impl VerilogModule {
         if let Some((last_para, params)) = self.param_list.split_last() {
             res.push(format!("{} #(", self.module_name));
             for p in params {
-                res.push(format!("    .{:<20}({:<10}),", p.name, p.value));
+                res.push(format!("    .{:<20}({:<10}),", p.name, p.get_name()));
             }
-            res.push(format!("    .{:<20}({:<10})", last_para.name, last_para.value));
+            res.push(format!("    .{:<20}({:<10})", last_para.name, last_para.get_name()));
             res.push(format!(") {} (", self.inst_name.as_ref().unwrap()));
         } else {
             res.push(format!(
@@ -212,7 +212,17 @@ impl VerilogModule {
     pub fn to_module_string(&self) -> Vec<String> {
         let mut res = Vec::new();
         let mut indent = 0;
-        res.push(format!("module {} (", self.module_name));
+        let param_string = if let Some((last_para, params)) = self.param_list.split_last() {
+            let mut res = vec![String::from("#(")];
+            for p in params {
+                res.push(format!("    parameter  {:<20} = {},", p.name, p.get_value()));
+            }
+            res.push(format!("    parameter  {:<20} = {}", last_para.name, last_para.get_value()));
+            res.push(")".into());
+            res.join("\n")
+        } else { String::from("") };
+
+        res.push(format!("module {} {} (", self.module_name, param_string));
 
         indent += 4;
 

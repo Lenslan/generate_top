@@ -7,7 +7,7 @@ use calamine::{Data, Range, Reader};
 use regex::Regex;
 use crate::verilog::data::{VerilogData, WrapMacro};
 use crate::verilog::module::VerilogModule;
-use crate::verilog::parameter::Param;
+use crate::verilog::parameter::{Param, ParamValue};
 use crate::verilog::port::{PortDir, UndefineWireCollector, VerilogPort};
 use crate::verilog::wire::WireBuilder;
 
@@ -55,7 +55,8 @@ impl ExcelReader {
         // extract module ports
         if let Ok(range) = workbook.worksheet_range(module_name) {
             log::debug!("Extracting sheet {}", module_name);
-            let (port_list, inst_name, params, _) = Self::extract_port(&range, true);
+            let (port_list, inst_name, params, _) =
+                Self::extract_port(&range, true, &Vec::new());
             module.add_ports(port_list);
             module.add_param_list(params);
             if let Some(s) = inst_name {
@@ -69,7 +70,8 @@ impl ExcelReader {
             log::debug!("Extracting sheet {}", inst_name);
             let mut inst_module = VerilogModule::new(String::from(inst_name));
             if let Ok(range) = workbook.worksheet_range(inst_name) {
-                let (port_list, inst_name, params, macro_string) = Self::extract_port(&range, false);
+                let (port_list, inst_name, params, macro_string) =
+                    Self::extract_port(&range, false, &module.param_list);
                 inst_module.add_ports(port_list);
                 inst_module.add_param_list(params);
                 if let Some(s) = inst_name {
@@ -102,6 +104,15 @@ impl ExcelReader {
             Some(Data::String(s)) => s.parse().unwrap(),
             Some(Data::Float(n)) => n.clone() as usize,
             _ => 0
+        }
+    }
+
+    fn extract_param(data: Option<&Data>, params: &Vec<Param>) -> ParamValue {
+        match data {
+            Some(Data::Int(n)) => (n.clone() as usize).into(),
+            Some(Data::String(s)) => ParamValue::gen_from_params(params, s.clone()),
+            Some(Data::Float(n)) => (n.clone() as usize).into(),
+            _ => 0.into()
         }
     }
 
@@ -173,7 +184,7 @@ impl ExcelReader {
 
     /// extract message from one sheet
     /// return Portlist & inst_name
-    fn extract_port(range: &Range<Data>, flag: bool) -> (Vec<VerilogData<VerilogPort>>, Option<&String>, Vec<Param>, Vec<String>) {
+    fn extract_port<'a>(range: &'a Range<Data>, flag: bool, param_list: &Vec<Param>) -> (Vec<VerilogData<VerilogPort>>, Option<&'a String>, Vec<Param>, Vec<String>) {
         let mut port_list = Vec::new();
         let mut inst_name = None;
         let mut params = Vec::new();
@@ -197,9 +208,13 @@ impl ExcelReader {
                     } else { 
                         let token = Self::extract_string(row_data.get(1));
                         Self::check_name_char(token.as_ref().unwrap());
-                        let value = Self::extract_width(row_data.get(2));
+                        let value = if param_list.len() > 0 {
+                            Self::extract_param(row_data.get(2), param_list)
+                        } else {
+                            Self::extract_width(row_data.get(2)).into()
+                        };
                         log::debug!("extract excel parameter token is :{:?}, value is {:?}", token, value);
-                        params.push(Param::new(token.unwrap(), value));
+                        params.push(Param::new_with_param(token.unwrap(), value));
                     }
                     continue;
                 }

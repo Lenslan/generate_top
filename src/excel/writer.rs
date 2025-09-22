@@ -77,6 +77,7 @@ impl ExcelWriter {
         UndefineWireCollector::clear();
         WireBuilder::clear();
         let mut module = VerilogModule::new(module_name.into());
+        module.add_param_list(VerilogModule::copy_parameter_from(&module_xlsx));
         // add inst
         for inst_excel in module_xlsx.inst_list.iter() {
             let inst_excel = inst_excel.borrow();
@@ -292,7 +293,7 @@ impl ExcelWriter {
         current_line += 1;
         for (_idx, para) in module.param_list.iter().enumerate() {
             sheet.write(current_line, 1, para.name.as_str()).unwrap();
-            sheet.write(current_line, 2, para.value as u32).unwrap();
+            sheet.write(current_line, 2, para.get_name()).unwrap();
             current_line += 1;
         }
 
