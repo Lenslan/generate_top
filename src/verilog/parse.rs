@@ -32,8 +32,8 @@ impl<'a> VerilogParser<'a> {
         }
     }
 
-    pub fn add_define(self, _define: Define) -> Self {
-        todo!("不知道hashmap的键值是啥");
+    pub fn add_define(mut self, name: impl Into<String>) -> Self {
+        self.defines.insert(name.into(), None);
         self
     }
 

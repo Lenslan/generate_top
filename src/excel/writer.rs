@@ -193,7 +193,11 @@ impl ExcelWriter {
         let mut module = VerilogModule::new(module_name.into());
 
         for f in self.file_list.iter() {
-            let inst_module = VerilogParser::new(f).parse().solve().get_module_info();
+            let inst_module = VerilogParser::new(f)
+                .add_includes(vec![self.module_dir_path.parent().unwrap().to_path_buf()])
+                .parse()
+                .solve()
+                .get_module_info();
             for mut inst_item in inst_module {
                 inst_item.set_default_inst_name();
                 inst_item.set_default_port_wires();
