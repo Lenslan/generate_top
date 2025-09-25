@@ -20,12 +20,12 @@ impl WireBuilder {
     ///
     /// register wire which connected to output port
     ///
-    pub fn add_driver_wire(name: &str, range: &Range<usize>) -> Arc<VerilogWire> {
+    pub fn add_driver_wire(name: &str, range: &Range<usize>, is_inout: bool) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload, error) = wire_builder
             .wires
             .entry(name.into())
-            .or_insert_with(|| (Arc::new(VerilogWire::new(name.into())), WirePayload::default(), WireError::default()));
+            .or_insert_with(|| (Arc::new(VerilogWire::new(name.into(), is_inout)), WirePayload::default(), WireError::default()));
         for i in range.clone().into_iter() {
             if !payload.driver.insert(i) {
                 // dont report error in anytime, only in health_check()
@@ -39,12 +39,12 @@ impl WireBuilder {
     ///
     /// register wire which connected to input port
     ///
-    pub fn add_load_wire(name: &str, range: &Range<usize>) -> Arc<VerilogWire> {
+    pub fn add_load_wire(name: &str, range: &Range<usize>, is_inout: bool) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload, _error) = wire_builder
             .wires
             .entry(name.into())
-            .or_insert_with(|| (Arc::new(VerilogWire::new(name.into())), WirePayload::default(), WireError::default()));
+            .or_insert_with(|| (Arc::new(VerilogWire::new(name.into(), is_inout)), WirePayload::default(), WireError::default()));
         for i in range.clone().into_iter() {
             payload.load.insert(i);
         }
@@ -54,11 +54,11 @@ impl WireBuilder {
     ///
     /// register wire which connected to output port
     ///
-    pub fn add_driver_wire_asport(name: &str, range: &Range<usize>) -> Arc<VerilogWire> {
+    pub fn add_driver_wire_asport(name: &str, range: &Range<usize>, is_inout: bool) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload, error) = wire_builder.wires.entry(name.into()).or_insert_with(|| {
             (
-                Arc::new(VerilogWire::new_port(name.into())),
+                Arc::new(VerilogWire::new_port(name.into(), is_inout)),
                 WirePayload::default(),
                 WireError::default(),
             )
@@ -76,11 +76,11 @@ impl WireBuilder {
     ///
     /// register wire which connected to input port
     ///
-    pub fn add_load_wire_asport(name: &str, range: &Range<usize>) -> Arc<VerilogWire> {
+    pub fn add_load_wire_asport(name: &str, range: &Range<usize>, is_inout: bool) -> Arc<VerilogWire> {
         let mut wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         let (arc_wire, payload, _error) = wire_builder.wires.entry(name.into()).or_insert_with(|| {
             (
-                Arc::new(VerilogWire::new_port(name.into())),
+                Arc::new(VerilogWire::new_port(name.into(), is_inout)),
                 WirePayload::default(),
                 WireError::default(),
             )
@@ -158,6 +158,9 @@ impl WireBuilder {
         log::info!("{}",">>> WireBuilder health check start <<<<".bright_green().bold());
         let wire_builder = WIRE_BUILDER_INSTANCE.lock().unwrap();
         for (wire, payload, error) in wire_builder.wires.values() {
+            if wire.inout_tag {
+                continue;
+            }
             // Self::check_driver_load(&payload.driver, &payload.load, &wire.name);
             let undriven = Self::check_undriven(&payload.driver, &payload.load);
             let unload = Self::check_unload(&payload.driver, &payload.load);
@@ -195,7 +198,7 @@ impl WireBuilder {
                         PortDir::OutPort => {
                             if payload.driver.len() > 0 { return true }
                         }
-                        PortDir::InOutPort => {}
+                        PortDir::InOutPort => { return true }
                         PortDir::Unknown => {}
                     }
                 }
@@ -273,19 +276,22 @@ impl WireBuilder {
 pub struct VerilogWire {
     pub(crate) name: String,
     port_tag: bool,
+    inout_tag: bool,
 }
 impl VerilogWire {
-    fn new(name: String) -> Self {
+    fn new(name: String, inout_tag: bool) -> Self {
         Self {
             name,
             port_tag: false,
+            inout_tag,
         }
     }
 
-    fn new_port(name: String) -> Self {
+    fn new_port(name: String, inout_tag: bool) -> Self {
         Self {
             name,
             port_tag: true,
+            inout_tag,
         }
     }
 
@@ -367,17 +373,17 @@ mod test {
     #[test]
     fn test_builder() {
         simple_logger::init_with_level(log::Level::Info).unwrap();
-        WireBuilder::add_load_wire("testwire1", &(0..1));
-        WireBuilder::add_driver_wire("testwire1", &(0..1));
-        WireBuilder::add_driver_wire("testwire2", &(0..6));
-        WireBuilder::add_load_wire("testwire3", &(0..2));
+        WireBuilder::add_load_wire("testwire1", &(0..1), false);
+        WireBuilder::add_driver_wire("testwire1", &(0..1), false);
+        WireBuilder::add_driver_wire("testwire2", &(0..6), false);
+        WireBuilder::add_load_wire("testwire3", &(0..2), false);
         WireBuilder::builder_show();
         println!("wire1 width is {}", WireBuilder::get_width("testwire1"));
         println!("wire2 width is {}", WireBuilder::get_width("testwire2"));
         println!("wire3 width is {}", WireBuilder::get_width("testwire3"));
         // println!("wire3 width is {}", WireBuilder::get_width("testwire333"));
 
-        WireBuilder::add_driver_wire("testwire2", &(0..1));
+        WireBuilder::add_driver_wire("testwire2", &(0..1), false);
         WireBuilder::check_health();
     }
 }

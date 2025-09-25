@@ -51,9 +51,9 @@ impl VerilogPort {
             return;
         }
         match self.inout {
-            PortDir::InPort => WireBuilder::add_driver_wire_asport(&self.name, &(0..self.width.width())),
-            PortDir::OutPort => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width.width())),
-            _ => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width.width())), //TODO how to process inout port
+            PortDir::InPort => WireBuilder::add_driver_wire_asport(&self.name, &(0..self.width.width()), false),
+            PortDir::OutPort => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width.width()), false),
+            _ => WireBuilder::add_load_wire_asport(&self.name, &(0..self.width.width()), true), 
         };
         self.health_checked = true;
     }
@@ -64,12 +64,12 @@ impl VerilogPort {
     ///
     fn connect_wire(&self, sig: &str, range: &Range<usize>) -> Arc<VerilogWire> {
         match (self.main_port_flag, self.inout) {
-            (false, PortDir::InPort) => WireBuilder::add_load_wire(sig, range),
-            (false, PortDir::OutPort) => WireBuilder::add_driver_wire(sig, range),
-            (false, _) => WireBuilder::add_load_wire(sig, range), //TODO how to process inout port
-            (true, PortDir::InPort) => WireBuilder::add_driver_wire(sig, range),
-            (true, PortDir::OutPort) => WireBuilder::add_load_wire(sig, range),
-            (true, _) => WireBuilder::add_driver_wire(sig, range), //TODO how to process inout port
+            (false, PortDir::InPort) => WireBuilder::add_load_wire(sig, range, false),
+            (false, PortDir::OutPort) => WireBuilder::add_driver_wire(sig, range, false),
+            (false, _) => WireBuilder::add_load_wire(sig, range, true), 
+            (true, PortDir::InPort) => WireBuilder::add_driver_wire(sig, range, false),
+            (true, PortDir::OutPort) => WireBuilder::add_load_wire(sig, range, false),
+            (true, _) => WireBuilder::add_driver_wire(sig, range, true),
         }
     }
 
