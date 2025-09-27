@@ -8,6 +8,8 @@ use crate::verilog::port::VerilogPort;
 
 ///
 /// type T may be VerilogModule, VerilogPort, VerilogWire
+/// used to wrap marco
+/// 
 #[derive(Debug, Display)]
 pub enum VerilogData<T> {
     Raw(T),

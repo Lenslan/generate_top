@@ -331,6 +331,10 @@ impl ExcelWriter {
             
             current_line += 1;
         }
+        
+        // write assign logic
+        sheet.write_with_format(current_line, 0, "Assing-Logic", &header_format).unwrap();
+        
 
         sheet
     }
