@@ -6,8 +6,8 @@ mod writer;
 pub mod data;
 pub mod parameter;
 pub mod width;
-mod assign;
-mod expression;
+pub mod assign;
+pub mod expression;
 
 trait VerilogBase {
     fn get_name(&self) -> String;
